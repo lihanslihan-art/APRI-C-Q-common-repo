@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>敏感词检查器</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{width:380px;min-height:500px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#0f0f13;color:#e0e0e0;font-size:13px}
+
+    /* Header */
+    .header{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:16px 18px 14px;border-bottom:1px solid #2a2a3e;display:flex;align-items:center;gap:10px}
+    .header-icon{width:32px;height:32px;background:linear-gradient(135deg,#e94560,#c0392b);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+    .header-title{font-size:15px;font-weight:700;color:#fff;letter-spacing:.5px}
+    .header-subtitle{font-size:11px;color:#666;margin-top:2px}
+    .header-badge{margin-left:auto;background:#e94560;color:#fff;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;display:none}
+
+    /* Tabs */
+    .tabs{display:flex;background:#0f0f13;border-bottom:1px solid #1e1e2e}
+    .tab-btn{flex:1;padding:10px 6px;border:none;background:none;color:#666;font-size:12px;cursor:pointer;transition:all .2s;border-bottom:2px solid transparent;font-weight:500}
+    .tab-btn.active{color:#e94560;border-bottom-color:#e94560}
+    .tab-btn:hover:not(.active){color:#aaa}
+
+    /* Panels */
+    .tab-panel{display:none;padding:14px}
+    .tab-panel.active{display:block}
+
+    /* Status card */
+    .scan-status{background:#1a1a2e;border:1px solid #2a2a3e;border-radius:10px;padding:14px;margin-bottom:12px}
+    .scan-status-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .scan-status-row:last-child{margin-bottom:0}
+    .status-label{color:#888;font-size:12px}
+    .status-value{font-weight:600;color:#e0e0e0;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .status-value.danger{color:#e94560}
+    .status-value.success{color:#2ecc71}
+    .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;background:#666}
+    .status-dot.active{background:#2ecc71;box-shadow:0 0 6px #2ecc71}
+    .status-dot.danger{background:#e94560;box-shadow:0 0 6px #e94560;animation:pulse 1.5s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+    /* PDF badge */
+    .mode-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;margin-bottom:10px}
+    .mode-badge.pdf{background:rgba(52,152,219,.2);color:#3498db;border:1px solid rgba(52,152,219,.3)}
+    .mode-badge.web{background:rgba(46,204,113,.2);color:#2ecc71;border:1px solid rgba(46,204,113,.3)}
+
+    /* Buttons */
+    .btn{width:100%;padding:10px 16px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px}
+    .btn-primary{background:linear-gradient(135deg,#e94560,#c0392b);color:#fff}
+    .btn-primary:hover{background:linear-gradient(135deg,#ff5a77,#d44235);transform:translateY(-1px);box-shadow:0 4px 12px rgba(233,69,96,.4)}
+    .btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+    .btn-secondary{background:#1e1e2e;color:#aaa;border:1px solid #2a2a3e}
+    .btn-secondary:hover{background:#2a2a3e;color:#e0e0e0}
+    .btn-sm{padding:6px 12px;font-size:12px;width:auto}
+    .btn-danger-sm{background:rgba(233,69,96,.15);color:#e94560;border:1px solid rgba(233,69,96,.3);padding:4px 10px;font-size:11px;border-radius:5px;cursor:pointer;transition:all .2s}
+    .btn-danger-sm:hover{background:rgba(233,69,96,.3)}
+
+    /* Results */
+    .results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .results-title{font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px}
+    .results-count{font-size:12px;color:#e94560;font-weight:700}
+    .result-list{max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+    .result-list::-webkit-scrollbar{width:4px}
+    .result-list::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px}
+    .result-item{background:#1a1a2e;border:1px solid #2a2a3e;border-radius:8px;padding:10px 12px;cursor:pointer;transition:all .2s;border-left:3px solid #e94560}
+    .result-item:hover{border-color:#e94560;background:#1e1e35;transform:translateX(2px)}
+    .result-item.pdf-item{cursor:default}
+    .result-item.pdf-item:hover{transform:none}
+    .result-word{font-size:12px;font-weight:700;color:#e94560;margin-bottom:5px;display:flex;align-items:center;gap:6px}
+    .result-index{background:rgba(233,69,96,.2);color:#e94560;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:600}
+    .result-context{font-size:11px;color:#888;line-height:1.5;word-break:break-all}
+    .result-context mark{background:rgba(233,69,96,.35);color:#ff7a8a;border-radius:2px;padding:0 1px;font-weight:700}
+    .result-nav{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+    .result-location{font-size:10px;color:#555}
+
+    /* PDF notice */
+    .pdf-notice{background:#1a1a2e;border:1px solid #2a2a3e;border-radius:8px;padding:12px;margin-bottom:12px;font-size:11px;color:#888;line-height:1.6}
+    .pdf-notice strong{color:#3498db}
+
+    /* Empty state */
+    .empty-state{text-align:center;padding:30px 20px;color:#555}
+    .empty-icon{font-size:36px;margin-bottom:10px;opacity:.5}
+    .empty-state p{font-size:12px;line-height:1.6}
+
+    /* Words / Settings */
+    .section-title{font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+    .add-word-row{display:flex;gap:8px;margin-bottom:14px}
+    .input-field{flex:1;background:#1a1a2e;border:1px solid #2a2a3e;border-radius:7px;padding:8px 12px;color:#e0e0e0;font-size:13px;outline:none;transition:border-color .2s}
+    .input-field:focus{border-color:#e94560}
+    .input-field::placeholder{color:#444}
+    .word-list{background:#1a1a2e;border:1px solid #2a2a3e;border-radius:10px;overflow:hidden;margin-bottom:12px;max-height:280px;overflow-y:auto}
+    .word-list::-webkit-scrollbar{width:4px}
+    .word-list::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px}
+    .word-item{display:flex;align-items:center;padding:9px 12px;border-bottom:1px solid #1e1e2e;transition:background .2s}
+    .word-item:last-child{border-bottom:none}
+    .word-item:hover{background:#1e1e35}
+    .word-text{flex:1;font-size:13px;color:#e0e0e0}
+    .word-tag{font-size:10px;padding:2px 7px;border-radius:3px;margin-right:8px;font-weight:600}
+    .word-tag.default{background:rgba(102,102,102,.2);color:#666}
+    .word-tag.custom{background:rgba(233,69,96,.2);color:#e94560}
+    .word-enabled{width:28px;height:16px;background:#2a2a3e;border-radius:8px;position:relative;cursor:pointer;transition:background .2s;margin-right:8px;flex-shrink:0}
+    .word-enabled.on{background:#e94560}
+    .word-enabled::after{content:'';position:absolute;width:12px;height:12px;background:#fff;border-radius:50%;top:2px;left:2px;transition:transform .2s}
+    .word-enabled.on::after{transform:translateX(12px)}
+    .option-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#1a1a2e;border:1px solid #2a2a3e;border-radius:8px;margin-bottom:8px}
+    .option-label{font-size:12px;color:#aaa}
+    .option-desc{font-size:10px;color:#555;margin-top:2px}
+    .toggle{width:36px;height:20px;background:#2a2a3e;border-radius:10px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
+    .toggle.on{background:#e94560}
+    .toggle::after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:2px;left:2px;transition:transform .2s}
+    .toggle.on::after{transform:translateX(16px)}
+    .import-export-row{display:flex;gap:8px;margin-top:10px}
+    .divider{height:1px;background:#1e1e2e;margin:12px 0}
+    .word-count-info{font-size:11px;color:#555;text-align:center;padding:8px}
+    .color-options{display:flex;gap:8px;margin-top:4px}
+    .color-dot{width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .2s}
+    .color-dot.selected{border-color:#fff;transform:scale(1.2)}
+
+    /* Progress bar for PDF */
+    .progress-wrap{background:#1a1a2e;border:1px solid #2a2a3e;border-radius:8px;padding:12px;margin-bottom:12px}
+    .progress-label{font-size:11px;color:#888;margin-bottom:6px}
+    .progress-bar{height:4px;background:#2a2a3e;border-radius:2px;overflow:hidden}
+    .progress-fill{height:100%;background:linear-gradient(90deg,#e94560,#f39c12);border-radius:2px;transition:width .3s;width:0%}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-icon">🔍</div>
+    <div>
+      <div class="header-title">敏感词检查器</div>
+      <div class="header-subtitle">网页 & PDF 内容审查工具</div>
+    </div>
+    <span class="header-badge" id="headerBadge">0</span>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="scan">🔍 扫描</button>
+    <button class="tab-btn" data-tab="words">📝 词库</button>
+    <button class="tab-btn" data-tab="settings">⚙️ 设置</button>
+  </div>
+
+  <!-- Scan Panel -->
+  <div class="tab-panel active" id="tab-scan">
+
+    <div class="scan-status">
+      <div class="scan-status-row">
+        <span class="status-label">当前页面</span>
+        <span class="status-value" id="currentUrl">加载中...</span>
+      </div>
+      <div class="scan-status-row">
+        <span class="status-label">扫描模式</span>
+        <span id="scanMode">—</span>
+      </div>
+      <div class="scan-status-row">
+        <span class="status-label">扫描状态</span>
+        <span class="status-value" id="scanStatusText">
+          <span class="status-dot" id="statusDot"></span>未扫描
+        </span>
+      </div>
+      <div class="scan-status-row">
+        <span class="status-label">发现敏感词</span>
+        <span class="status-value danger" id="foundCount">—</span>
+      </div>
+    </div>
+
+    <div id="pdfNotice" class="pdf-notice" style="display:none">
+      📄 检测到 <strong>PDF 文件</strong>，将直接读取 PDF 内容提取文字进行扫描。<br>
+      结果仅在弹窗中展示，可用 <strong>Ctrl+F</strong> 在 PDF 中定位原文。
+    </div>
+
+    <div id="progressWrap" class="progress-wrap" style="display:none">
+      <div class="progress-label" id="progressLabel">正在解析 PDF...</div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+
+    <button class="btn btn-primary" id="btnScan" style="margin-bottom:8px">🔍 开始扫描</button>
+    <button class="btn btn-secondary" id="btnClear" style="margin-bottom:14px">🗑️ 清除高亮</button>
+
+    <div class="results-header" id="resultsHeader" style="display:none">
+      <span class="results-title">扫描结果</span>
+      <span class="results-count" id="resultsCount">0 处</span>
+    </div>
+
+    <div class="result-list" id="resultList">
+      <div class="empty-state">
+        <div class="empty-icon">📄</div>
+        <p>点击「开始扫描」检查<br>当前页面中的敏感词</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Words Panel -->
+  <div class="tab-panel" id="tab-words">
+    <div class="section-title">添加敏感词</div>
+    <div class="add-word-row">
+      <input type="text" class="input-field" id="newWordInput" placeholder="输入敏感词，支持正则表达式" />
+      <button class="btn btn-primary btn-sm" id="btnAddWord">添加</button>
+    </div>
+    <div class="results-header">
+      <span class="section-title">词库列表</span>
+      <span class="results-count" id="wordCount">0 个</span>
+    </div>
+    <div class="word-list" id="wordList">
+      <div class="word-count-info">加载中...</div>
+    </div>
+    <div class="import-export-row">
+      <button class="btn btn-secondary btn-sm" id="btnExport" style="flex:1">📤 导出词库</button>
+      <button class="btn btn-secondary btn-sm" id="btnImport" style="flex:1">📥 导入词库</button>
+    </div>
+    <input type="file" id="importFile" accept=".json" style="display:none">
+  </div>
+
+  <!-- Settings Panel -->
+  <div class="tab-panel" id="tab-settings">
+    <div class="section-title">扫描设置</div>
+    <div class="option-row">
+      <div><div class="option-label">自动扫描</div><div class="option-desc">页面加载完成后自动扫描</div></div>
+      <div class="toggle" id="toggleAutoScan"></div>
+    </div>
+    <div class="option-row">
+      <div><div class="option-label">区分大小写</div><div class="option-desc">匹配时区分英文大小写</div></div>
+      <div class="toggle" id="toggleCaseSensitive"></div>
+    </div>
+    <div class="option-row">
+      <div><div class="option-label">显示上下文字数</div><div class="option-desc">敏感词前后显示的字符数</div></div>
+      <select class="input-field" id="contextLength" style="width:80px;padding:4px 8px">
+        <option value="30">30字</option>
+        <option value="50" selected>50字</option>
+        <option value="80">80字</option>
+        <option value="120">120字</option>
+      </select>
+    </div>
+    <div class="divider"></div>
+    <div class="section-title">高亮颜色</div>
+    <div class="option-row" style="justify-content:flex-start;gap:12px">
+      <div class="color-dot selected" style="background:#e94560" data-color="#e94560"></div>
+      <div class="color-dot" style="background:#f39c12" data-color="#f39c12"></div>
+      <div class="color-dot" style="background:#9b59b6" data-color="#9b59b6"></div>
+      <div class="color-dot" style="background:#3498db" data-color="#3498db"></div>
+      <div class="color-dot" style="background:#2ecc71" data-color="#2ecc71"></div>
+    </div>
+    <div class="divider"></div>
+    <div class="section-title">数据管理</div>
+    <button class="btn btn-secondary" id="btnResetWords" style="margin-bottom:8px">🔄 恢复默认词库</button>
+    <button class="btn btn-secondary" id="btnClearAll">🗑️ 清空所有数据</button>
+  </div>
+
+  <script src="pdf-extractor.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

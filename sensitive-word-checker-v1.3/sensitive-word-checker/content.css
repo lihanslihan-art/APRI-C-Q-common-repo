@@ -1,0 +1,54 @@
+/* Sensitive Word Checker — injected page styles v1.3 */
+.swc-panel {
+  position: fixed !important;
+  bottom: 20px !important;
+  right: 20px !important;
+  z-index: 2147483647 !important;
+  background: #1a1a2e !important;
+  border: 1px solid #2a2a3e !important;
+  border-radius: 10px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,.55) !important;
+  min-width: 270px !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif !important;
+  font-size: 13px !important;
+  overflow: hidden !important;
+  user-select: none !important;
+}
+.swc-panel-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 10px 14px !important;
+  background: #16213e !important;
+  border-bottom: 1px solid #2a2a3e !important;
+  font-weight: 600 !important;
+  color: #e0e0e0 !important;
+}
+.swc-close-btn {
+  background: rgba(255,255,255,.1) !important;
+  border: none !important; color: #aaa !important;
+  width: 22px !important; height: 22px !important;
+  border-radius: 50% !important; cursor: pointer !important;
+  font-size: 11px !important; line-height: 22px !important;
+  text-align: center !important; padding: 0 !important;
+}
+.swc-close-btn:hover { background: rgba(233,69,96,.45) !important; color: #fff !important; }
+.swc-nav-btn {
+  background: rgba(255,255,255,.1) !important;
+  border: none !important; color: #ccc !important;
+  width: 22px !important; height: 22px !important;
+  border-radius: 4px !important; cursor: pointer !important;
+  font-size: 12px !important; line-height: 22px !important;
+  text-align: center !important; padding: 0 !important;
+}
+.swc-nav-btn:hover { background: rgba(233,69,96,.45) !important; color: #fff !important; }
+.swc-nav-count {
+  color: #888 !important; font-size: 11px !important;
+  min-width: 38px !important; text-align: center !important;
+  font-weight: normal !important;
+}
+mark.swc-highlight { display: inline !important; }
+mark.swc-highlight.swc-focused {
+  outline: 2px solid #fff !important;
+  outline-offset: 1px !important;
+}
