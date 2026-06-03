@@ -1,0 +1,17 @@
+[Unit]
+Description=SG Compliance Hub (Next.js production)
+After=network.target
+
+[Service]
+Type=simple
+User=admin
+WorkingDirectory=/home/admin/APRI-C-Q-common-repo/sg-compliance
+Environment=NODE_ENV=production
+ExecStart=/home/admin/APRI-C-Q-common-repo/sg-compliance/node_modules/.bin/next start -H 0.0.0.0 -p 3000
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/var/log/sg-compliance.log
+StandardError=append:/var/log/sg-compliance.log
+
+[Install]
+WantedBy=multi-user.target
