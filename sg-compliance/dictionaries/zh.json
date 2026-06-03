@@ -27,16 +27,25 @@
   },
   "news": {
     "heading": "合规新闻动态",
-    "subheading": "聚合新加坡合规相关新闻，每小时刷新一次。点击标题跳转至原文。",
+    "subheading": "聚合新加坡、中国、美国、日本四地合规相关新闻，每小时刷新一次。点击标题跳转至原文。",
     "lastRefresh": "最近刷新",
     "itemsCount": "条",
     "empty": "暂无符合该筛选条件的新闻。可能尚未触发首次刷新，或上游源返回为空。",
     "filterAll": "全部",
+    "filterCategory": "类别",
+    "filterRegion": "地区",
     "categories": {
       "exportControl": "出口管制",
       "tradeSecrets": "商业秘密",
       "employment": "合法用工",
       "general": "综合"
+    },
+    "regions": {
+      "sg": "新加坡",
+      "cn": "中国",
+      "us": "美国",
+      "jp": "日本",
+      "global": "全球"
     }
   },
   "modules": {

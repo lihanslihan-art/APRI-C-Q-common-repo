@@ -35,6 +35,14 @@ export default async function Home({
     general: dict.news.categories.general,
   };
 
+  const regionLabels: Record<string, string> = {
+    sg: dict.news.regions.sg,
+    cn: dict.news.regions.cn,
+    us: dict.news.regions.us,
+    jp: dict.news.regions.jp,
+    global: dict.news.regions.global,
+  };
+
   return (
     <div className="mx-auto max-w-6xl px-4">
       <section className="py-14 sm:py-20">
@@ -104,6 +112,7 @@ export default async function Home({
                 item={item}
                 locale={typed}
                 categoryLabel={categoryLabels[item.category] ?? item.category}
+                regionLabel={regionLabels[item.region] ?? item.region}
               />
             ))}
           </div>

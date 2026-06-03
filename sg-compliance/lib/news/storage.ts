@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 import type { NewsItem, NewsStore } from "./types";
 
 const STORE_PATH = resolve(process.cwd(), "data", "news.json");
-const MAX_ITEMS = 200;
+const MAX_ITEMS = 400;
 const EMPTY: NewsStore = { updatedAt: "", items: [] };
 
 export async function loadStore(): Promise<NewsStore> {

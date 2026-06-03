@@ -27,16 +27,25 @@
   },
   "news": {
     "heading": "Compliance News",
-    "subheading": "Aggregated Singapore compliance headlines, refreshed hourly. Click an item to open the original source.",
+    "subheading": "Aggregated compliance headlines across Singapore, China, the United States, and Japan — refreshed hourly. Click an item to open the original source.",
     "lastRefresh": "Last refresh",
     "itemsCount": "items",
     "empty": "No news yet for this filter. The hourly refresh may not have run, or the upstream feed returned nothing.",
     "filterAll": "All",
+    "filterCategory": "Category",
+    "filterRegion": "Region",
     "categories": {
       "exportControl": "Export Control",
       "tradeSecrets": "Trade Secrets",
       "employment": "Employment",
       "general": "General"
+    },
+    "regions": {
+      "sg": "Singapore",
+      "cn": "China",
+      "us": "United States",
+      "jp": "Japan",
+      "global": "Global"
     }
   },
   "modules": {

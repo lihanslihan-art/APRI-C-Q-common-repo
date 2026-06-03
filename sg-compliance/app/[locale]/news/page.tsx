@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Locale } from "@/lib/i18n-config";
 import { getDictionary } from "@/lib/dictionary";
 import { loadStore } from "@/lib/news/storage";
-import { NEWS_CATEGORIES } from "@/lib/news/types";
+import { NEWS_CATEGORIES, NEWS_REGIONS } from "@/lib/news/types";
 import { NewsCard } from "@/components/NewsCard";
 import { NewsFilter } from "@/components/NewsFilter";
 
@@ -23,10 +23,10 @@ export default async function NewsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ cat?: string }>;
+  searchParams: Promise<{ cat?: string; region?: string }>;
 }) {
   const { locale } = await params;
-  const { cat } = await searchParams;
+  const { cat, region } = await searchParams;
   const typed = locale as Locale;
   const dict = await getDictionary(typed);
   const store = await loadStore();
@@ -34,10 +34,15 @@ export default async function NewsPage({
   const activeCat = (NEWS_CATEGORIES as readonly string[]).includes(cat ?? "")
     ? cat!
     : "all";
-  const items =
-    activeCat === "all"
-      ? store.items
-      : store.items.filter((it) => it.category === activeCat);
+  const activeRegion = (NEWS_REGIONS as readonly string[]).includes(region ?? "")
+    ? region!
+    : "all";
+
+  const items = store.items.filter((it) => {
+    if (activeCat !== "all" && it.category !== activeCat) return false;
+    if (activeRegion !== "all" && it.region !== activeRegion) return false;
+    return true;
+  });
 
   const categoryLabels: Record<string, string> = {
     all: dict.news.filterAll,
@@ -45,6 +50,15 @@ export default async function NewsPage({
     "trade-secrets": dict.news.categories.tradeSecrets,
     employment: dict.news.categories.employment,
     general: dict.news.categories.general,
+  };
+
+  const regionLabels: Record<string, string> = {
+    all: dict.news.filterAll,
+    sg: dict.news.regions.sg,
+    cn: dict.news.regions.cn,
+    us: dict.news.regions.us,
+    jp: dict.news.regions.jp,
+    global: dict.news.regions.global,
   };
 
   return (
@@ -63,11 +77,18 @@ export default async function NewsPage({
       </p>
       <p className="mt-2 text-xs text-slate-500 dark:text-slate-500">
         {dict.news.lastRefresh}: {formatUpdated(store.updatedAt, typed)} ·{" "}
-        {store.items.length} {dict.news.itemsCount}
+        {items.length} / {store.items.length} {dict.news.itemsCount}
       </p>
 
       <div className="mt-6">
-        <NewsFilter labels={categoryLabels} active={activeCat} />
+        <NewsFilter
+          categoryLabels={categoryLabels}
+          regionLabels={regionLabels}
+          activeCategory={activeCat}
+          activeRegion={activeRegion}
+          categoryGroupLabel={dict.news.filterCategory}
+          regionGroupLabel={dict.news.filterRegion}
+        />
       </div>
 
       {items.length === 0 ? (
@@ -82,6 +103,7 @@ export default async function NewsPage({
               item={item}
               locale={typed}
               categoryLabel={categoryLabels[item.category] ?? item.category}
+              regionLabel={regionLabels[item.region] ?? item.region}
             />
           ))}
         </div>

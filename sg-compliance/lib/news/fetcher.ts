@@ -35,6 +35,7 @@ export async function fetchSource(source: NewsSource): Promise<NewsItem[]> {
       sourceId: source.id,
       sourceName: source.name,
       category: source.category,
+      region: source.region,
       title,
       link,
       snippet: cleanSnippet(it.contentSnippet || it.content || it.summary),

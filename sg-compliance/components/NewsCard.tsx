@@ -7,6 +7,14 @@ const CATEGORY_COLOR: Record<string, string> = {
   general: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
 };
 
+const REGION_FLAG: Record<string, string> = {
+  sg: "🇸🇬",
+  cn: "🇨🇳",
+  us: "🇺🇸",
+  jp: "🇯🇵",
+  global: "🌐",
+};
+
 function formatDate(iso: string, locale: string): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -22,10 +30,12 @@ export function NewsCard({
   item,
   locale,
   categoryLabel,
+  regionLabel,
 }: {
   item: NewsItem;
   locale: string;
   categoryLabel: string;
+  regionLabel: string;
 }) {
   return (
     <a
@@ -39,6 +49,9 @@ export function NewsCard({
           className={`rounded-full px-2 py-0.5 font-medium uppercase tracking-wide ${CATEGORY_COLOR[item.category] ?? CATEGORY_COLOR.general}`}
         >
           {categoryLabel}
+        </span>
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+          {REGION_FLAG[item.region] ?? ""} {regionLabel}
         </span>
         <span className="text-slate-500 dark:text-slate-400">
           {formatDate(item.publishedAt, locale)}
