@@ -30,6 +30,25 @@ sudo systemctl stop    sg-compliance
 tail -f /var/log/sg-compliance.log
 ```
 
+### DeepSeek API key (Phase 3)
+
+The `/api/chat` endpoint requires `DEEPSEEK_API_KEY`. The systemd unit reads
+it from `/etc/sg-compliance/env`:
+
+```bash
+sudo mkdir -p /etc/sg-compliance
+sudo tee /etc/sg-compliance/env > /dev/null <<'EOF'
+DEEPSEEK_API_KEY=sk-your-real-key-here
+EOF
+sudo chmod 0640 /etc/sg-compliance/env
+sudo chown root:admin /etc/sg-compliance/env
+sudo systemctl restart sg-compliance
+```
+
+Without the key the chat page renders fine but the API returns HTTP 503
+with `{"error":"missing_api_key"}`. The file is *not* in git; see
+`.env.example` for the template.
+
 ### News refresh timer (Phase 2)
 
 A systemd timer hits `/api/news/refresh` hourly to repopulate `data/news.json`.

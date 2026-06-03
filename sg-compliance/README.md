@@ -7,8 +7,8 @@
 ## Phases
 
 - **Phase 1 ✅** — 3 个静态合规模块、首页布局、中英双语路由、顶部导航与语言切换。
-- **Phase 2 ✅** — 新闻聚合：4 个 RSS 源（3 个分类 Google News + Business Times），`/api/news/refresh` 端点 + systemd timer 每小时拉，落地为 `data/news.json`，列表页 `/[locale]/news` 支持按类别筛选，首页展示最新 4 条。
-- **Phase 3** — AI 助手：DeepSeek API + 对已有合规内容做 RAG，自然语言问答。
+- **Phase 2 ✅** — 新闻聚合：12 个 RSS 源（3 类别 × 4 地区 SG/CN/US/JP 的 Google News 查询），`/api/news/refresh` 端点 + systemd timer 每小时拉，落地为 `data/news.json`（cap 400），列表页 `/[locale]/news` 支持类别 × 地区双轴筛选，首页展示最新 4 条。
+- **Phase 3 ✅** — AI 助手：`/[locale]/chat` 客户端流式对话，`/api/chat` 通过 `lib/ai/deepseek.ts` 调用 DeepSeek（OpenAI 兼容），不做 RAG —— 把全部合规模块内容（约 5-8K tokens）+ 最近 30 条新闻一次性塞进 system prompt。需在 `/etc/sg-compliance/env` 配置 `DEEPSEEK_API_KEY`。
 - **Phase 4** — 搜索、收藏、全站多语言切换打磨、部署。
 
 ## Stack

@@ -123,9 +123,13 @@ export default async function Home({
         <h2 className="text-xl font-semibold tracking-tight">
           {dict.home.chatTitle}
         </h2>
-        <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-400">
-          {dict.home.chatPlaceholder}
-        </div>
+        <Link
+          href={`/${typed}/chat`}
+          className="mt-4 block rounded-xl border border-slate-200 bg-gradient-to-br from-slate-900 to-slate-700 p-6 text-white transition hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-800 dark:from-slate-100 dark:to-slate-300 dark:text-slate-900"
+        >
+          <div className="text-sm leading-relaxed">{dict.home.chatPlaceholder}</div>
+          <div className="mt-3 text-sm font-medium">{dict.home.chatOpen} →</div>
+        </Link>
       </section>
     </div>
   );

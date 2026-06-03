@@ -7,6 +7,7 @@ Type=simple
 User=admin
 WorkingDirectory=/home/admin/APRI-C-Q-common-repo/sg-compliance
 Environment=NODE_ENV=production
+EnvironmentFile=-/etc/sg-compliance/env
 ExecStart=/home/admin/APRI-C-Q-common-repo/sg-compliance/node_modules/.bin/next start -H 0.0.0.0 -p 3000
 Restart=on-failure
 RestartSec=5

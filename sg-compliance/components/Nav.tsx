@@ -10,6 +10,7 @@ export function Nav({ locale, dict }: { locale: Locale; dict: Dictionary }) {
     { href: `/${locale}/trade-secrets`, label: dict.nav.tradeSecrets },
     { href: `/${locale}/employment`, label: dict.nav.employment },
     { href: `/${locale}/news`, label: dict.nav.news },
+    { href: `/${locale}/chat`, label: dict.nav.chat },
   ];
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
@@ -27,8 +28,6 @@ export function Nav({ locale, dict }: { locale: Locale; dict: Dictionary }) {
               {l.label}
             </Link>
           ))}
-          <span className="text-slate-400 dark:text-slate-600">·</span>
-          <span className="text-slate-400 dark:text-slate-600">{dict.nav.chat}</span>
         </nav>
         <div className="ml-auto sm:ml-0">
           <LanguageSwitcher currentLocale={locale} label={dict.nav.switchLang} />

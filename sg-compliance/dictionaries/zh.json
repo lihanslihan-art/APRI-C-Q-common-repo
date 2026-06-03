@@ -21,9 +21,10 @@
     "newsTitle": "最新合规新闻",
     "newsPlaceholder": "新闻聚合将在 Phase 2 上线 —— 数据源包含 MAS、MOM、新加坡海关等。",
     "chatTitle": "AI 助手",
-    "chatPlaceholder": "基于 DeepSeek 的 RAG 检索问答将在 Phase 3 接入。",
+    "chatPlaceholder": "由 DeepSeek 驱动，基于站内合规模块与最新聚合新闻作答。",
+    "chatOpen": "进入对话",
     "newsViewAll": "查看全部",
-    "phaseBadge": "Phase 2 · 新闻聚合已上线"
+    "phaseBadge": "Phase 3 · AI 助手已上线"
   },
   "news": {
     "heading": "合规新闻动态",
@@ -47,6 +48,26 @@
       "jp": "日本",
       "global": "全球"
     }
+  },
+  "chat": {
+    "heading": "AI 合规助手",
+    "subheading": "随时提问新加坡合规相关话题。助手以本站精选合规模块及最新 SG / CN / US / JP 聚合新闻为依据，由 DeepSeek 驱动。",
+    "inputPlaceholder": "提问出口管制、商业秘密、合法用工，或最近的合规动态……",
+    "send": "发送",
+    "stop": "停止",
+    "thinking": "正在思考……",
+    "errorPrefix": "错误",
+    "empty": "开启一段对话。助手可以横向对比多个司法管辖区的合规框架、总结精选模块内容，或解读近期的合规新闻。",
+    "exampleHeading": "试试这些示例",
+    "examples": [
+      "从新加坡出口军民两用物资需要哪些许可证？",
+      "对比新加坡与美国在商业秘密保护上的差异。",
+      "概述 2025 年《职场公平法》的核心条款及生效时间。",
+      "近期有哪些影响对华贸易的合规新闻？"
+    ],
+    "disclaimer": "仅供信息参考，不构成法律意见。助手基于本站合规模块作答，并可能引用近期新闻条目。",
+    "you": "你",
+    "assistant": "助手"
   },
   "modules": {
     "exportControl": {

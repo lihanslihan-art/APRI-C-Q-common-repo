@@ -21,9 +21,10 @@
     "newsTitle": "Latest Compliance News",
     "newsPlaceholder": "News aggregation arrives in Phase 2 — sources will include MAS, MOM, and Singapore Customs.",
     "chatTitle": "AI Assistant",
-    "chatPlaceholder": "DeepSeek-powered RAG over curated content arrives in Phase 3.",
+    "chatPlaceholder": "Powered by DeepSeek. Grounded on the compliance modules and the latest aggregated news.",
+    "chatOpen": "Open the assistant",
     "newsViewAll": "View all",
-    "phaseBadge": "Phase 2 · News aggregation online"
+    "phaseBadge": "Phase 3 · AI assistant online"
   },
   "news": {
     "heading": "Compliance News",
@@ -47,6 +48,26 @@
       "jp": "Japan",
       "global": "Global"
     }
+  },
+  "chat": {
+    "heading": "AI Compliance Assistant",
+    "subheading": "Ask anything about Singapore compliance — the assistant is grounded on this site's curated modules and the latest aggregated news across SG / CN / US / JP. Powered by DeepSeek.",
+    "inputPlaceholder": "Ask about export control, trade secrets, employment, or a recent compliance development…",
+    "send": "Send",
+    "stop": "Stop",
+    "thinking": "Thinking…",
+    "errorPrefix": "Error",
+    "empty": "Start a conversation. The assistant can compare frameworks across jurisdictions, summarise the curated modules, or contextualise a recent news item.",
+    "exampleHeading": "Try one of these",
+    "examples": [
+      "What permits do I need to export dual-use goods from Singapore?",
+      "Compare trade secret protection in Singapore vs. the United States.",
+      "Summarise the Workplace Fairness Act 2025 and when it takes effect.",
+      "What recent news affects exporters dealing with China?"
+    ],
+    "disclaimer": "Informational only — not legal advice. The assistant is grounded on the modules and may also reference recent news items.",
+    "you": "You",
+    "assistant": "Assistant"
   },
   "modules": {
     "exportControl": {
