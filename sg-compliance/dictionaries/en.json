@@ -1,0 +1,201 @@
+{
+  "site": {
+    "name": "SG Compliance Hub",
+    "tagline": "Aggregator for Singapore compliance — curated guides, news, and AI-powered Q&A"
+  },
+  "nav": {
+    "home": "Home",
+    "exportControl": "Export Control",
+    "tradeSecrets": "Trade Secrets",
+    "employment": "Employment",
+    "news": "News",
+    "chat": "AI Assistant",
+    "switchLang": "中文"
+  },
+  "home": {
+    "heroTitle": "Singapore Compliance, Made Accessible",
+    "heroSubtitle": "Curated, plain-language guides on Singapore export control, trade secrets, and employment compliance — with an AI assistant for natural-language search.",
+    "ctaModules": "Browse Modules",
+    "ctaChat": "Ask the AI",
+    "modulesTitle": "Compliance Modules",
+    "newsTitle": "Latest Compliance News",
+    "newsPlaceholder": "News aggregation arrives in Phase 2 — sources will include MAS, MOM, and Singapore Customs.",
+    "chatTitle": "AI Assistant",
+    "chatPlaceholder": "DeepSeek-powered RAG over curated content arrives in Phase 3.",
+    "phaseBadge": "Phase 1 · Static modules online"
+  },
+  "modules": {
+    "exportControl": {
+      "title": "Export Control",
+      "summary": "Strategic Goods (Control) Act, permits via TradeNet, brokering controls, and catch-all end-use checks.",
+      "status": "Available"
+    },
+    "tradeSecrets": {
+      "title": "Trade Secrets",
+      "summary": "Common-law breach of confidence, NDAs, Penal Code & Computer Misuse Act remedies — Singapore has no standalone Trade Secrets Act.",
+      "status": "Available"
+    },
+    "employment": {
+      "title": "Employment",
+      "summary": "Employment Act, MOM Work Pass framework (EP / S Pass / Work Permit), COMPASS, CPF, and the Workplace Fairness Act 2025.",
+      "status": "Available"
+    }
+  },
+  "common": {
+    "lastUpdated": "Last updated",
+    "officialSources": "Official Sources",
+    "keyConcepts": "Key Concepts",
+    "penalties": "Penalties",
+    "practicalNotes": "Practical Notes",
+    "backToHome": "Back to home"
+  },
+  "footer": {
+    "disclaimer": "This site is an informational POC. Content is not legal advice. Consult a qualified Singapore practitioner for matters of legal consequence.",
+    "builtWith": "Built with Next.js · POC by APRI C&Q"
+  },
+  "exportControl": {
+    "heading": "Export Control in Singapore",
+    "lead": "Singapore's export control regime governs the export, transhipment, transit, and brokering of strategic goods and technology. Compliance is administered by Singapore Customs under the Strategic Goods (Control) Act.",
+    "sections": {
+      "legalBasis": {
+        "title": "Legal Basis",
+        "items": [
+          "Strategic Goods (Control) Act 2002 (SGCA) — the principal statute.",
+          "Strategic Goods (Control) Order — Schedule lists Military Goods and Dual-Use Goods (aligned to the Wassenaar, NSG, MTCR, Australia Group lists).",
+          "Strategic Goods (Control) (Brokering) Order — covers brokering of strategic goods outside Singapore.",
+          "Regulation of Imports and Exports Act — general import/export controls."
+        ]
+      },
+      "permits": {
+        "title": "Permits & TradeNet",
+        "items": [
+          "Individual Permit — one-off shipment of listed goods.",
+          "Bulk Permit — repeat shipments to approved consignees over a fixed period.",
+          "Special Permit — intra-company transfers or other defined low-risk scenarios.",
+          "All applications are submitted through TradeNet, Singapore's single-window trade platform."
+        ]
+      },
+      "catchAll": {
+        "title": "Catch-All Controls",
+        "items": [
+          "Even unlisted items can require a permit if the exporter knows or is informed they may be used for WMD or military end-use of concern.",
+          "Exporters must conduct end-user and end-use due diligence (red-flag screening, denied-party lists)."
+        ]
+      },
+      "penalties": {
+        "title": "Penalties",
+        "items": [
+          "Basic offence: fine up to S$100,000 or 3× the value of the goods (whichever is higher), or imprisonment up to 2 years, or both.",
+          "Aggravated offence (e.g. WMD end-use): imprisonment up to 5 years.",
+          "Corporate convictions can trigger debarment from TradeNet privileges."
+        ]
+      },
+      "sources": {
+        "title": "Official Sources",
+        "items": [
+          "Singapore Customs — customs.gov.sg/businesses/strategic-goods-control",
+          "Strategic Goods (Control) Act on Singapore Statutes Online — sso.agc.gov.sg",
+          "TradeNet — tradenet.gov.sg"
+        ]
+      }
+    }
+  },
+  "tradeSecrets": {
+    "heading": "Trade Secret Protection in Singapore",
+    "lead": "Singapore does not have a dedicated Trade Secrets Act. Protection is built from a combination of common-law breach of confidence, contractual safeguards, and a handful of criminal statutes.",
+    "sections": {
+      "commonLaw": {
+        "title": "Common Law: Breach of Confidence",
+        "items": [
+          "The Coco v AN Clark test (adopted in Singapore via cases such as PH Hydraulics & Engineering v Airtrust): (i) information has the necessary quality of confidence; (ii) it was imparted in circumstances importing an obligation of confidence; (iii) there was unauthorized use to the claimant's detriment.",
+          "I-Admin (Singapore) v Hong Ying Ting (CA, 2020) modified the framework — once confidential information is shown to have been accessed, the burden shifts to the defendant to disprove a conscience-affecting wrong."
+        ]
+      },
+      "contracts": {
+        "title": "Contractual Safeguards",
+        "items": [
+          "Non-Disclosure Agreements (NDAs) — standard for business dealings; ensure scope, duration, and permitted disclosures are precise.",
+          "Restrictive covenants (non-compete, non-solicit) — enforceable only if protecting a legitimate proprietary interest and reasonable in scope/duration/geography.",
+          "Employment contracts should include explicit confidentiality, IP assignment, and return-of-property clauses."
+        ]
+      },
+      "criminal": {
+        "title": "Criminal & Statutory Routes",
+        "items": [
+          "Penal Code s.408 — criminal breach of trust by a clerk or servant.",
+          "Computer Misuse Act 1993 — criminalises unauthorised access to or modification of computer material.",
+          "Copyright Act 2021 — protects source code as a literary work where applicable."
+        ]
+      },
+      "remedies": {
+        "title": "Remedies",
+        "items": [
+          "Interim and final injunctions (including springboard relief).",
+          "Damages or, alternatively, an account of profits.",
+          "Delivery up or destruction of materials embodying the confidential information."
+        ]
+      },
+      "practical": {
+        "title": "Practical Notes",
+        "items": [
+          "Mark documents \"Confidential\" and limit access on a need-to-know basis.",
+          "Maintain audit trails — access logs strengthen later litigation.",
+          "Conduct exit interviews and obtain written acknowledgments of continuing confidentiality obligations."
+        ]
+      }
+    }
+  },
+  "employment": {
+    "heading": "Singapore Employment Compliance",
+    "lead": "Employment in Singapore is governed primarily by the Employment Act (administered by MOM), supplemented by the Work Pass framework, CPF rules, and tripartite guidelines that are progressively being put on statutory footing.",
+    "sections": {
+      "employmentAct": {
+        "title": "Employment Act (EA)",
+        "items": [
+          "Covers all employees (local and foreign) under a contract of service, with some exclusions for seafarers, domestic workers, and statutory board / civil service staff.",
+          "Part IV (working hours, rest day, overtime) applies only to workmen earning ≤ S$4,500/month and non-workmen earning ≤ S$2,600/month.",
+          "Minimum terms: paid public holidays, sick leave, annual leave, maternity / paternity / childcare leave (under the Child Development Co-Savings Act)."
+        ]
+      },
+      "workPass": {
+        "title": "Work Pass Framework",
+        "items": [
+          "Employment Pass (EP) — professionals; min fixed monthly salary S$5,600 (S$6,200 for financial services); COMPASS points-based assessment from Sep 2023.",
+          "S Pass — mid-skilled; min S$3,300 (S$3,800 for financial services); subject to quota and monthly levy.",
+          "Work Permit — semi-skilled in construction, marine, manufacturing, services, and process; sector-specific quotas (Dependency Ratio Ceilings).",
+          "ONE Pass — top earners (≥ S$30,000/month) or established achievers; 5-year duration, no employer tie."
+        ]
+      },
+      "compass": {
+        "title": "COMPASS (Complementarity Assessment)",
+        "items": [
+          "Applies to new and renewed EP applications since Sep 2023 / Sep 2024.",
+          "Scoring across four foundational criteria (salary, qualifications, firm diversity, firm support for locals) and two bonus criteria (skills bonus, strategic economic priorities)."
+        ]
+      },
+      "cpf": {
+        "title": "CPF Contributions",
+        "items": [
+          "Mandatory for Singapore citizens and Permanent Residents only — not for foreign Work Pass holders.",
+          "Employer + employee contributions vary by age band; ordinary wage ceiling raised progressively (S$8,000/month effective 2026)."
+        ]
+      },
+      "fairness": {
+        "title": "Workplace Fairness Act 2025",
+        "items": [
+          "Passed in January 2025 — first standalone anti-discrimination statute in Singapore.",
+          "Prohibits discrimination on protected characteristics (age, nationality, sex, marital/family status, pregnancy, race, religion, language, disability, mental health).",
+          "Takes effect in phases from 2026 / 2027; replaces voluntary TGFEP for covered grounds."
+        ]
+      },
+      "sources": {
+        "title": "Official Sources",
+        "items": [
+          "Ministry of Manpower — mom.gov.sg",
+          "Tripartite Alliance for Fair & Progressive Employment Practices (TAFEP) — tal.sg/tafep",
+          "CPF Board — cpf.gov.sg"
+        ]
+      }
+    }
+  }
+}
