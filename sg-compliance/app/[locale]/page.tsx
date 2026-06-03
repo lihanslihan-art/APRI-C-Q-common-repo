@@ -2,6 +2,10 @@ import Link from "next/link";
 import { i18n, type Locale } from "@/lib/i18n-config";
 import { getDictionary } from "@/lib/dictionary";
 import { ModuleCard } from "@/components/ModuleCard";
+import { NewsCard } from "@/components/NewsCard";
+import { loadStore } from "@/lib/news/storage";
+
+export const dynamic = "force-dynamic";
 
 export async function generateStaticParams() {
   return i18n.locales.map((locale) => ({ locale }));
@@ -15,21 +19,21 @@ export default async function Home({
   const { locale } = await params;
   const typed = locale as Locale;
   const dict = await getDictionary(typed);
+  const store = await loadStore();
+  const latestNews = store.items.slice(0, 4);
 
   const modules = [
-    {
-      href: `/${typed}/export-control`,
-      ...dict.modules.exportControl,
-    },
-    {
-      href: `/${typed}/trade-secrets`,
-      ...dict.modules.tradeSecrets,
-    },
-    {
-      href: `/${typed}/employment`,
-      ...dict.modules.employment,
-    },
+    { href: `/${typed}/export-control`, ...dict.modules.exportControl },
+    { href: `/${typed}/trade-secrets`, ...dict.modules.tradeSecrets },
+    { href: `/${typed}/employment`, ...dict.modules.employment },
   ];
+
+  const categoryLabels: Record<string, string> = {
+    "export-control": dict.news.categories.exportControl,
+    "trade-secrets": dict.news.categories.tradeSecrets,
+    employment: dict.news.categories.employment,
+    general: dict.news.categories.general,
+  };
 
   return (
     <div className="mx-auto max-w-6xl px-4">
@@ -77,12 +81,33 @@ export default async function Home({
       </section>
 
       <section className="py-10">
-        <h2 className="text-xl font-semibold tracking-tight">
-          {dict.home.newsTitle}
-        </h2>
-        <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-400">
-          {dict.home.newsPlaceholder}
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-xl font-semibold tracking-tight">
+            {dict.home.newsTitle}
+          </h2>
+          <Link
+            href={`/${typed}/news`}
+            className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+          >
+            {dict.home.newsViewAll} →
+          </Link>
         </div>
+        {latestNews.length === 0 ? (
+          <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-400">
+            {dict.home.newsPlaceholder}
+          </div>
+        ) : (
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            {latestNews.map((item) => (
+              <NewsCard
+                key={item.id}
+                item={item}
+                locale={typed}
+                categoryLabel={categoryLabels[item.category] ?? item.category}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       <section id="chat" className="pb-14">

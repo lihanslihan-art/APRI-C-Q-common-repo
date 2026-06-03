@@ -22,7 +22,22 @@
     "newsPlaceholder": "News aggregation arrives in Phase 2 — sources will include MAS, MOM, and Singapore Customs.",
     "chatTitle": "AI Assistant",
     "chatPlaceholder": "DeepSeek-powered RAG over curated content arrives in Phase 3.",
-    "phaseBadge": "Phase 1 · Static modules online"
+    "newsViewAll": "View all",
+    "phaseBadge": "Phase 2 · News aggregation online"
+  },
+  "news": {
+    "heading": "Compliance News",
+    "subheading": "Aggregated Singapore compliance headlines, refreshed hourly. Click an item to open the original source.",
+    "lastRefresh": "Last refresh",
+    "itemsCount": "items",
+    "empty": "No news yet for this filter. The hourly refresh may not have run, or the upstream feed returned nothing.",
+    "filterAll": "All",
+    "categories": {
+      "exportControl": "Export Control",
+      "tradeSecrets": "Trade Secrets",
+      "employment": "Employment",
+      "general": "General"
+    }
   },
   "modules": {
     "exportControl": {

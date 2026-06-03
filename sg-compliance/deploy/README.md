@@ -30,6 +30,26 @@ sudo systemctl stop    sg-compliance
 tail -f /var/log/sg-compliance.log
 ```
 
+### News refresh timer (Phase 2)
+
+A systemd timer hits `/api/news/refresh` hourly to repopulate `data/news.json`.
+
+```bash
+sudo cp deploy/sg-compliance-refresh.service /etc/systemd/system/
+sudo cp deploy/sg-compliance-refresh.timer   /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now sg-compliance-refresh.timer
+
+# Manual trigger / inspect
+sudo systemctl start    sg-compliance-refresh.service
+systemctl list-timers   sg-compliance-refresh.timer
+cat /tmp/sg-compliance-refresh.json
+```
+
+Optional shared-secret guard for `/api/news/refresh`: set `NEWS_REFRESH_SECRET`
+in the main service's environment, then append `?key=$SECRET` to the curl in
+`sg-compliance-refresh.service`.
+
 ### Aliyun security group
 
 The ECS security group must permit inbound TCP on port 3000 from the IPs that

@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# runtime news cache (refreshed by /api/news/refresh)
+/data/*
+!/data/.gitkeep

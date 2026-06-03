@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly trigger for SG Compliance Hub news refresh
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1h
+Persistent=true
+Unit=sg-compliance-refresh.service
+
+[Install]
+WantedBy=timers.target

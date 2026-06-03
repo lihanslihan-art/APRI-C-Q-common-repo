@@ -1,0 +1,9 @@
+[Unit]
+Description=Trigger SG Compliance Hub news refresh
+After=sg-compliance.service
+Requires=sg-compliance.service
+
+[Service]
+Type=oneshot
+User=admin
+ExecStart=/usr/bin/curl -fsS --max-time 60 http://127.0.0.1:3000/api/news/refresh -o /tmp/sg-compliance-refresh.json

@@ -22,7 +22,22 @@
     "newsPlaceholder": "新闻聚合将在 Phase 2 上线 —— 数据源包含 MAS、MOM、新加坡海关等。",
     "chatTitle": "AI 助手",
     "chatPlaceholder": "基于 DeepSeek 的 RAG 检索问答将在 Phase 3 接入。",
-    "phaseBadge": "Phase 1 · 静态模块已上线"
+    "newsViewAll": "查看全部",
+    "phaseBadge": "Phase 2 · 新闻聚合已上线"
+  },
+  "news": {
+    "heading": "合规新闻动态",
+    "subheading": "聚合新加坡合规相关新闻，每小时刷新一次。点击标题跳转至原文。",
+    "lastRefresh": "最近刷新",
+    "itemsCount": "条",
+    "empty": "暂无符合该筛选条件的新闻。可能尚未触发首次刷新，或上游源返回为空。",
+    "filterAll": "全部",
+    "categories": {
+      "exportControl": "出口管制",
+      "tradeSecrets": "商业秘密",
+      "employment": "合法用工",
+      "general": "综合"
+    }
   },
   "modules": {
     "exportControl": {

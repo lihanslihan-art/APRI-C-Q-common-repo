@@ -7,7 +7,7 @@
 ## Phases
 
 - **Phase 1 ✅** — 3 个静态合规模块、首页布局、中英双语路由、顶部导航与语言切换。
-- **Phase 2** — 新闻聚合：RSS 订阅 + 必要的 HTML 抓取，定时任务，列表/详情页。来源候选：MAS、MOM、Singapore Customs、Singapore Law Watch。
+- **Phase 2 ✅** — 新闻聚合：4 个 RSS 源（3 个分类 Google News + Business Times），`/api/news/refresh` 端点 + systemd timer 每小时拉，落地为 `data/news.json`，列表页 `/[locale]/news` 支持按类别筛选，首页展示最新 4 条。
 - **Phase 3** — AI 助手：DeepSeek API + 对已有合规内容做 RAG，自然语言问答。
 - **Phase 4** — 搜索、收藏、全站多语言切换打磨、部署。
 
