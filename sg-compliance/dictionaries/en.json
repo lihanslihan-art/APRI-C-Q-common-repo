@@ -10,7 +10,17 @@
     "employment": "Employment",
     "news": "News",
     "chat": "AI Assistant",
+    "searchPlaceholder": "Search modules & news…",
     "switchLang": "中文"
+  },
+  "search": {
+    "heading": "Search",
+    "subheading": "Search across the compliance modules and recent regional news.",
+    "inputPlaceholder": "e.g. work pass, TradeNet, breach of confidence…",
+    "empty": "Type a query above to search across modules and news.",
+    "noResults": "No results for \"{q}\". Try different keywords.",
+    "moduleResults": "From compliance modules",
+    "newsResults": "From recent news"
   },
   "home": {
     "heroTitle": "Singapore Compliance, Made Accessible",

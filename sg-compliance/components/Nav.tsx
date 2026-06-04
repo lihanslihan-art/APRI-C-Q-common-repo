@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Locale } from "@/lib/i18n-config";
 import type { Dictionary } from "@/lib/dictionary";
 import { LanguageSwitcher } from "./LanguageSwitcher";
+import { SearchBox } from "./SearchBox";
 
 export function Nav({ locale, dict }: { locale: Locale; dict: Dictionary }) {
   const links = [
@@ -14,7 +15,7 @@ export function Nav({ locale, dict }: { locale: Locale; dict: Dictionary }) {
   ];
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
-      <div className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3">
+      <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
         <Link href={`/${locale}`} className="text-sm font-semibold tracking-tight">
           {dict.site.name}
         </Link>
@@ -29,6 +30,9 @@ export function Nav({ locale, dict }: { locale: Locale; dict: Dictionary }) {
             </Link>
           ))}
         </nav>
+        <div className="hidden md:block">
+          <SearchBox locale={locale} placeholder={dict.nav.searchPlaceholder} />
+        </div>
         <div className="ml-auto sm:ml-0">
           <LanguageSwitcher currentLocale={locale} label={dict.nav.switchLang} />
         </div>

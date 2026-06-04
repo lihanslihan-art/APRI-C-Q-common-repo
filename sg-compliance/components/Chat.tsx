@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Message {
   role: "user" | "assistant";
@@ -139,17 +141,92 @@ export function Chat({
               <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 {m.role === "user" ? strings.you : strings.assistant}
               </div>
-              <div
-                className={
-                  m.role === "user"
-                    ? "whitespace-pre-wrap rounded-xl bg-slate-900 px-4 py-3 text-sm text-white dark:bg-slate-100 dark:text-slate-900"
-                    : "whitespace-pre-wrap rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
-                }
-              >
-                {m.content || (loading && i === messages.length - 1
-                  ? strings.thinking
-                  : "")}
-              </div>
+              {m.role === "user" ? (
+                <div className="whitespace-pre-wrap rounded-xl bg-slate-900 px-4 py-3 text-sm text-white dark:bg-slate-100 dark:text-slate-900">
+                  {m.content}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
+                  {m.content ? (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        p: ({ children }) => (
+                          <p className="mb-2 last:mb-0">{children}</p>
+                        ),
+                        ul: ({ children }) => (
+                          <ul className="my-2 list-disc space-y-1 pl-5">{children}</ul>
+                        ),
+                        ol: ({ children }) => (
+                          <ol className="my-2 list-decimal space-y-1 pl-5">{children}</ol>
+                        ),
+                        li: ({ children }) => <li>{children}</li>,
+                        strong: ({ children }) => (
+                          <strong className="font-semibold">{children}</strong>
+                        ),
+                        em: ({ children }) => <em className="italic">{children}</em>,
+                        code: ({ children }) => (
+                          <code className="rounded bg-slate-100 px-1 py-0.5 text-[12px] dark:bg-slate-800">
+                            {children}
+                          </code>
+                        ),
+                        pre: ({ children }) => (
+                          <pre className="my-2 overflow-x-auto rounded-lg bg-slate-100 p-3 text-xs dark:bg-slate-800">
+                            {children}
+                          </pre>
+                        ),
+                        a: ({ href, children }) => (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
+                            {children}
+                          </a>
+                        ),
+                        h1: ({ children }) => (
+                          <h3 className="mt-3 mb-2 text-base font-semibold">{children}</h3>
+                        ),
+                        h2: ({ children }) => (
+                          <h3 className="mt-3 mb-2 text-base font-semibold">{children}</h3>
+                        ),
+                        h3: ({ children }) => (
+                          <h3 className="mt-3 mb-2 text-base font-semibold">{children}</h3>
+                        ),
+                        blockquote: ({ children }) => (
+                          <blockquote className="my-2 border-l-2 border-slate-300 pl-3 text-slate-600 dark:border-slate-600 dark:text-slate-400">
+                            {children}
+                          </blockquote>
+                        ),
+                        table: ({ children }) => (
+                          <div className="my-2 overflow-x-auto">
+                            <table className="min-w-full border-collapse text-xs">
+                              {children}
+                            </table>
+                          </div>
+                        ),
+                        th: ({ children }) => (
+                          <th className="border border-slate-300 bg-slate-100 px-2 py-1 text-left font-semibold dark:border-slate-700 dark:bg-slate-800">
+                            {children}
+                          </th>
+                        ),
+                        td: ({ children }) => (
+                          <td className="border border-slate-300 px-2 py-1 dark:border-slate-700">
+                            {children}
+                          </td>
+                        ),
+                      }}
+                    >
+                      {m.content}
+                    </ReactMarkdown>
+                  ) : loading && i === messages.length - 1 ? (
+                    <span className="text-slate-500 dark:text-slate-400">
+                      {strings.thinking}
+                    </span>
+                  ) : null}
+                </div>
+              )}
             </div>
           ))
         )}

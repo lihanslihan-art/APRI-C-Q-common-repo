@@ -10,7 +10,17 @@
     "employment": "合法用工",
     "news": "合规新闻",
     "chat": "AI 助手",
+    "searchPlaceholder": "搜索模块和新闻……",
     "switchLang": "EN"
+  },
+  "search": {
+    "heading": "全站搜索",
+    "subheading": "在合规模块与近期区域新闻中检索关键词。",
+    "inputPlaceholder": "如 工作准证、TradeNet、保密义务……",
+    "empty": "输入关键词以同时检索模块条文和新闻。",
+    "noResults": "未找到与 \"{q}\" 匹配的内容。换个关键词试试。",
+    "moduleResults": "来自合规模块",
+    "newsResults": "来自最新新闻"
   },
   "home": {
     "heroTitle": "化繁为简的新加坡合规指南",
