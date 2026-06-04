@@ -30,15 +30,17 @@ sudo systemctl stop    sg-compliance
 tail -f /var/log/sg-compliance.log
 ```
 
-### DeepSeek API key (Phase 3)
+### LLM API key (Phase 3 — Tencent Token Plan, GLM-5.1)
 
-The `/api/chat` endpoint requires `DEEPSEEK_API_KEY`. The systemd unit reads
-it from `/etc/sg-compliance/env`:
+The `/api/chat` endpoint requires `TOKENPLAN_API_KEY` (`sk-tp-...`). It hits
+`https://api.lkeap.cloud.tencent.com/plan/v3/chat/completions` with model
+`glm-5.1` (OpenAI-compatible). The systemd unit reads the key from
+`/etc/sg-compliance/env`:
 
 ```bash
 sudo mkdir -p /etc/sg-compliance
 sudo tee /etc/sg-compliance/env > /dev/null <<'EOF'
-DEEPSEEK_API_KEY=sk-your-real-key-here
+TOKENPLAN_API_KEY=sk-tp-your-real-key-here
 EOF
 sudo chmod 0640 /etc/sg-compliance/env
 sudo chown root:admin /etc/sg-compliance/env

@@ -5,7 +5,7 @@ export interface ChatMessage {
   content: string;
 }
 
-export interface DeepSeekOptions {
+export interface LLMOptions {
   apiKey: string;
   baseUrl?: string;
   model?: string;
@@ -14,11 +14,14 @@ export interface DeepSeekOptions {
   signal?: AbortSignal;
 }
 
-export async function streamDeepSeek(
-  opts: DeepSeekOptions,
+const DEFAULT_BASE = "https://api.lkeap.cloud.tencent.com/plan/v3";
+const DEFAULT_MODEL = "glm-5.1";
+
+export async function streamChat(
+  opts: LLMOptions,
 ): Promise<ReadableStream<Uint8Array>> {
-  const base = (opts.baseUrl ?? "https://api.deepseek.com").replace(/\/+$/, "");
-  const upstream = await fetch(`${base}/v1/chat/completions`, {
+  const base = (opts.baseUrl ?? DEFAULT_BASE).replace(/\/+$/, "");
+  const upstream = await fetch(`${base}/chat/completions`, {
     method: "POST",
     signal: opts.signal,
     headers: {
@@ -26,7 +29,7 @@ export async function streamDeepSeek(
       Authorization: `Bearer ${opts.apiKey}`,
     },
     body: JSON.stringify({
-      model: opts.model ?? "deepseek-chat",
+      model: opts.model ?? DEFAULT_MODEL,
       messages: opts.messages,
       stream: true,
       temperature: opts.temperature ?? 0.3,
@@ -35,7 +38,7 @@ export async function streamDeepSeek(
 
   if (!upstream.ok || !upstream.body) {
     const detail = await upstream.text().catch(() => "");
-    throw new Error(`DeepSeek API ${upstream.status}: ${detail.slice(0, 400)}`);
+    throw new Error(`LLM upstream ${upstream.status}: ${detail.slice(0, 400)}`);
   }
 
   return new ReadableStream<Uint8Array>({

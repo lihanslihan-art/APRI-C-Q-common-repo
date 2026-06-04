@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { i18n, type Locale } from "@/lib/i18n-config";
 import { buildSystemPrompt } from "@/lib/ai/context";
-import { streamDeepSeek, type ChatMessage } from "@/lib/ai/deepseek";
+import { streamChat, type ChatMessage } from "@/lib/ai/llm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,13 +15,13 @@ interface ChatRequest {
 }
 
 export async function POST(req: Request) {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const apiKey = process.env.TOKENPLAN_API_KEY ?? process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
       {
         error: "missing_api_key",
         message:
-          "DEEPSEEK_API_KEY is not configured on the server. Add it to /etc/sg-compliance/env and restart sg-compliance.service.",
+          "TOKENPLAN_API_KEY is not configured on the server. Add it to /etc/sg-compliance/env and restart sg-compliance.service.",
       },
       { status: 503 },
     );
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
   ];
 
   try {
-    const stream = await streamDeepSeek({ apiKey, messages });
+    const stream = await streamChat({ apiKey, messages });
     return new Response(stream, {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
