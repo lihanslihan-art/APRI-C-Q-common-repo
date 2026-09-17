@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>专利起草工作台 · Patent Workbench</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f7f7f5; --surface: #fff; --surface-2: #f0f0ed;
+    --border: #d9d9d4; --border-strong: #bcbcb4;
+    --text: #1a1a18; --text-dim: #63635c; --text-faint: #8e8e85;
+    --accent: #b40000; --accent-soft: #fdecec;
+    --ok: #1a7f46; --ok-soft: #e7f6ec;
+    --warn: #8a5a00; --warn-soft: #fdf3dd;
+    --info: #1d4ed8; --info-soft: #e8eefc;
+    --radius: 6px;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #17171a; --surface: #1f1f23; --surface-2: #27272c;
+      --border: #34343a; --border-strong: #4a4a52;
+      --text: #e8e8e4; --text-dim: #a2a29a; --text-faint: #75756d;
+      --accent: #ff6b6b; --accent-soft: #35201f;
+      --ok: #4ade80; --ok-soft: #14301f;
+      --warn: #fbbf24; --warn-soft: #332611;
+      --info: #7aa2f7; --info-soft: #1a2237;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #17171a; --surface: #1f1f23; --surface-2: #27272c;
+    --border: #34343a; --border-strong: #4a4a52;
+    --text: #e8e8e4; --text-dim: #a2a29a; --text-faint: #75756d;
+    --accent: #ff6b6b; --accent-soft: #35201f;
+    --ok: #4ade80; --ok-soft: #14301f;
+    --warn: #fbbf24; --warn-soft: #332611;
+    --info: #7aa2f7; --info-soft: #1a2237;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.55 var(--sans);
+         padding-bottom: env(safe-area-inset-bottom, 0px); }
+  header { position: sticky; top: 0; z-index: 20; background: var(--surface);
+           border-bottom: 1px solid var(--border); padding: 10px 16px;
+           padding-top: calc(10px + env(safe-area-inset-top, 0px)); }
+  .hrow { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 15px; margin: 0; font-weight: 650; }
+  h1 .en { color: var(--text-faint); font-weight: 400; margin-left: 6px; font-size: 13px; }
+  #slots { color: var(--text-dim); font-size: 12px; font-family: var(--mono); margin-left: auto; }
+  .ghost { background: none; border: 1px solid var(--border); color: var(--text-dim);
+           border-radius: var(--radius); padding: 3px 8px; font: 12px var(--sans); cursor: pointer; }
+  .ghost:hover:not(:disabled) { border-color: var(--border-strong); color: var(--text); }
+  .ghost:disabled { opacity: .45; cursor: not-allowed; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; gap: 16px;
+         grid-template-columns: minmax(0, 360px) minmax(0, 1fr); align-items: start; }
+  @media (max-width: 820px) { main { grid-template-columns: minmax(0, 1fr); } }
+  .card { background: var(--surface); border: 1px solid var(--border);
+          border-radius: var(--radius); padding: 14px; }
+  .sect { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .06em;
+          color: var(--text-faint); margin: 0 0 10px; }
+  label { display: block; font-size: 12px; color: var(--text-dim); margin: 10px 0 4px; }
+  input[type=text], textarea, select {
+    width: 100%; padding: 8px 10px; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: var(--radius); font: 13px var(--sans); }
+  textarea { min-height: 150px; resize: vertical; font: 13px/1.5 var(--mono); }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button.primary { width: 100%; margin-top: 12px; padding: 9px; font: 600 14px var(--sans);
+    cursor: pointer; background: var(--accent); color: #fff; border: none; border-radius: var(--radius); }
+  button.primary:hover:not(:disabled) { filter: brightness(1.08); }
+  button.primary:disabled { opacity: .5; cursor: not-allowed; }
+  .hint { font-size: 11px; color: var(--text-faint); margin-top: 6px; }
+  .badge { font: 600 11px var(--mono); padding: 1px 6px; border-radius: 3px;
+           background: var(--surface-2); color: var(--text-dim); border: 1px solid var(--border);
+           white-space: nowrap; }
+  .badge.queued, .badge.rejected, .badge.cancelled { }
+  .badge.screening, .badge.drafting { background: var(--info-soft); color: var(--info); border-color: var(--info); }
+  .badge.awaiting_approval { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+  .badge.done { background: var(--ok-soft); color: var(--ok); border-color: var(--ok); }
+  .badge.failed { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+  ul#joblist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  ul#joblist li { border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 8px 10px; cursor: pointer; background: var(--surface); }
+  ul#joblist li:hover { border-color: var(--border-strong); }
+  ul#joblist li.sel { border-color: var(--accent); background: var(--accent-soft); }
+  .jt { font-weight: 600; font-size: 13px; overflow-wrap: anywhere; }
+  .jm { font: 11px var(--mono); color: var(--text-faint); margin-top: 3px;
+        display: flex; gap: 8px; flex-wrap: wrap; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; font-size: 12px; }
+  .kv dt { color: var(--text-faint); font-family: var(--mono); }
+  .kv dd { margin: 0; overflow-wrap: anywhere; }
+  .summary { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 10px; margin: 10px 0; white-space: pre-wrap; font-size: 13px; overflow-wrap: anywhere; }
+  .gate { border: 1px solid var(--warn); background: var(--warn-soft);
+          border-radius: var(--radius); padding: 12px; margin: 12px 0; }
+  .gate h4 { margin: 0 0 6px; font-size: 13px; color: var(--warn); }
+  .gate .row { display: flex; gap: 8px; margin-top: 10px; }
+  .gate button { flex: 1; padding: 8px; font: 600 13px var(--sans); cursor: pointer;
+    border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); }
+  .gate button.yes { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .gate button.no { background: var(--surface); }
+  #log { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 8px; max-height: 420px; overflow-y: auto; font: 11.5px/1.5 var(--mono); }
+  .ev { display: flex; gap: 8px; padding: 1px 0; overflow-wrap: anywhere; }
+  .ev .t { color: var(--text-faint); flex: none; }
+  .ev .k { flex: none; font-weight: 600; min-width: 68px; }
+  .ev.tool .k { color: var(--info); }
+  .ev.text .k { color: var(--ok); }
+  .ev.err .k, .ev.failed .k { color: var(--accent); }
+  .ev.result .k { color: var(--warn); }
+  .ev .d { color: var(--text-dim); white-space: pre-wrap; }
+  .arts { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4px; }
+  .arts li { display: flex; gap: 8px; align-items: baseline; font-size: 12px; }
+  .arts a { font-family: var(--mono); }
+  .arts .sz { color: var(--text-faint); font: 11px var(--mono); margin-left: auto; flex: none; }
+  .empty { color: var(--text-faint); font-size: 13px; padding: 24px 8px; text-align: center; }
+  .err { color: var(--accent); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hrow">
+    <h1>专利起草工作台<span class="en">Patent Workbench</span></h1>
+    <span id="slots">…</span>
+    <button class="ghost" id="theme">主题</button>
+  </div>
+</header>
+
+<main>
+  <div>
+    <div class="card">
+      <p class="sect">提交新想法</p>
+      <form id="form">
+        <label for="f-title">工作标题</label>
+        <input type="text" id="f-title" maxlength="200" placeholder="例如：基于负载分级的 NPCA 抢占抑制" required>
+
+        <label for="f-track">专利类型</label>
+        <select id="f-track">
+          <option value="std">WiFi 标准演进型 — 走 MAC 路线</option>
+          <option value="product">WiFi 产品体验型 — 走交互路线</option>
+          <option value="generic">非 WiFi 产品型 — 产品/UX 路线</option>
+        </select>
+
+        <label for="f-idea">想法描述</label>
+        <textarea id="f-idea" minlength="30" maxlength="40000" required
+          placeholder="描述场景、痛点、你想保护的机制。写得越具体，筛查和起草的质量越高。至少 30 字。"></textarea>
+
+        <button class="primary" type="submit" id="submit">提交筛查</button>
+        <p class="hint">提交后先跑先行技术闸门和起草前分析，<b>不会直接起草</b>。
+          筛查完会停下来等你批准，这是技能自己的规则。</p>
+        <p class="err" id="formerr"></p>
+      </form>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <p class="sect">任务 <button class="ghost" id="refresh" style="float:right">刷新</button></p>
+      <ul id="joblist"></ul>
+    </div>
+  </div>
+
+  <div class="card" id="detail">
+    <div class="empty">左侧选一个任务，或提交一个新想法。</div>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const LABEL = { queued:"排队中", screening:"筛查中", awaiting_approval:"等待批准",
+  drafting:"起草中", done:"完成", failed:"失败", rejected:"已否决", cancelled:"已取消" };
+const KIND = { init:"init", text:"说明", tool:"工具", tool_result:"结果",
+  thinking:"思考", result:"小结", phase_start:"阶段开始", awaiting_approval:"待批准",
+  done:"完成", failed:"失败", status:"状态" };
+
+let sel = null, es = null, timer = null;
+
+(function theme() {
+  let saved = null;
+  try { saved = localStorage.getItem("pw-theme"); } catch (e) {}
+  if (saved) document.documentElement.dataset.theme = saved;
+  $("theme").onclick = () => {
+    const cur = document.documentElement.dataset.theme;
+    const dark = cur ? cur === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    const next = dark ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("pw-theme", next); } catch (e) {}
+  };
+})();
+
+const fmtBytes = (n) => n < 1024 ? n + " B"
+  : n < 1048576 ? (n/1024).toFixed(0) + " KB" : (n/1048576).toFixed(1) + " MB";
+const fmtTime = (s) => new Date(s * 1000).toLocaleString();
+const clock = (s) => new Date(s * 1000).toLocaleTimeString();
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const d = r.status === 204 ? null : await r.json().catch(() => null);
+  if (!r.ok) throw new Error((d && d.detail) || r.statusText);
+  return d;
+}
+
+async function loadSlots() {
+  try {
+    const s = await api("/api/slots");
+    $("slots").textContent =
+      `运行 ${s.active}/${s.max_concurrent} · 排队 ${s.queued} · ${s.model}` +
+      ` · 语料服务${s.corpus_api_reachable ? "正常" : "不可达"}`;
+    $("slots").style.color = s.corpus_api_reachable ? "" : "var(--accent)";
+  } catch (e) { $("slots").textContent = "服务未就绪"; }
+}
+
+async function loadJobs() {
+  try {
+    const d = await api("/api/jobs?limit=60");
+    const ul = $("joblist");
+    if (!d.jobs.length) { ul.innerHTML = `<div class="empty">还没有任务。</div>`; return; }
+    ul.innerHTML = d.jobs.map(j => `
+      <li data-id="${esc(j.id)}" class="${j.id === sel ? "sel" : ""}">
+        <div class="jt">${esc(j.title)}</div>
+        <div class="jm">
+          <span class="badge ${esc(j.status)}">${esc(LABEL[j.status] || j.status)}</span>
+          <span>${esc(j.id.slice(0, 15))}</span>
+          <span>$${(j.cost_usd || 0).toFixed(3)}</span>
+        </div>
+      </li>`).join("");
+    for (const li of ul.children) {
+      if (li.dataset.id) li.onclick = () => select(li.dataset.id);
+    }
+  } catch (e) { $("joblist").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+
+function select(id) {
+  sel = id;
+  for (const li of $("joblist").children) li.classList?.toggle("sel", li.dataset?.id === id);
+  renderDetail();
+}
+
+async function renderDetail() {
+  if (!sel) return;
+  let j;
+  try { j = await api("/api/jobs/" + encodeURIComponent(sel)); }
+  catch (e) { $("detail").innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
+
+  const rows = [
+    ["状态", LABEL[j.status] || j.status], ["类型", j.track], ["任务号", j.id],
+    ["会话", j.session_id ? j.session_id.slice(0, 8) : "—"],
+    ["花费", "$" + (j.cost_usd || 0).toFixed(4)], ["轮数", j.num_turns],
+    ["创建", fmtTime(j.created_at)],
+    ["结束", j.finished_at ? fmtTime(j.finished_at) : "—"],
+  ];
+
+  let html = `<p class="sect">${esc(j.title)}
+    <span class="badge ${esc(j.status)}" style="float:right">${esc(LABEL[j.status] || j.status)}</span></p>
+    <dl class="kv">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`;
+
+  if (j.error) html += `<p class="err" style="margin-top:10px">${esc(j.error)}</p>`;
+  if (j.screen_summary) html += `<p class="sect" style="margin-top:14px">筛查结论</p>
+    <div class="summary">${esc(j.screen_summary)}</div>`;
+
+  if (j.status === "awaiting_approval") {
+    html += `<div class="gate">
+      <h4>等待你的决定</h4>
+      <div>技能规定起草前必须由人明确同意。批准后会<b>恢复同一个 Agent 会话</b>继续起草，
+        筛查阶段的分析仍在上下文里，不会重做。</div>
+      <label for="g-note">附带说明（可选，会传给 Agent）</label>
+      <input type="text" id="g-note" maxlength="4000" placeholder="例如：收窄到单链路场景，别碰 MLO">
+      <div class="row">
+        <button class="yes" id="g-yes">批准起草</button>
+        <button class="no" id="g-no">否决</button>
+      </div>
+    </div>`;
+  }
+
+  if (["queued", "screening", "drafting"].includes(j.status)) {
+    html += `<div style="margin:10px 0"><button class="ghost" id="g-cancel">取消任务</button></div>`;
+  }
+
+  if (j.artifacts && j.artifacts.length) {
+    html += `<p class="sect" style="margin-top:14px">产物 (${j.artifacts.length})</p>
+      <ul class="arts">${j.artifacts.map(a => `<li>
+        <a href="/api/jobs/${encodeURIComponent(j.id)}/artifacts/${a.path.split("/").map(encodeURIComponent).join("/")}"
+           target="_blank" rel="noopener">${esc(a.path)}</a>
+        <span class="sz">${fmtBytes(a.bytes)}</span></li>`).join("")}</ul>`;
+  }
+
+  html += `<p class="sect" style="margin-top:14px">执行日志</p><div id="log"></div>`;
+  $("detail").innerHTML = html;
+
+  if ($("g-yes")) $("g-yes").onclick = () => gate("approve");
+  if ($("g-no")) $("g-no").onclick = () => gate("reject");
+  if ($("g-cancel")) $("g-cancel").onclick = async () => {
+    if (!confirm("取消这个任务？正在运行的 Agent 进程会被终止。")) return;
+    try { await api(`/api/jobs/${encodeURIComponent(sel)}/cancel`, { method: "POST" }); }
+    catch (e) { alert(e.message); }
+    loadJobs(); renderDetail();
+  };
+
+  openStream(j.id);
+}
+
+async function gate(action) {
+  const btns = document.querySelectorAll(".gate button");
+  btns.forEach(b => b.disabled = true);
+  const note = $("g-note") ? $("g-note").value : "";
+  try {
+    await api(`/api/jobs/${encodeURIComponent(sel)}/${action}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note }),
+    });
+  } catch (e) { alert(e.message); btns.forEach(b => b.disabled = false); return; }
+  loadJobs(); renderDetail(); loadSlots();
+}
+
+function addEvent(ev) {
+  const log = $("log");
+  if (!log) return;
+  const near = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+  const kind = ev.kind || "?";
+  const cls = kind === "tool_result" && ev.is_error ? "err" : kind;
+  let detail = "";
+  if (kind === "tool") detail = `${ev.name || ""} ${ev.detail || ""}`;
+  else if (kind === "text") detail = ev.text || "";
+  else if (kind === "tool_result") detail = ev.preview || "";
+  else if (kind === "result") detail = `${ev.subtype || ""} $${(ev.cost_usd || 0).toFixed(4)} · ${ev.turns || 0} 轮`;
+  else if (kind === "init") detail = `会话 ${(ev.session_id || "").slice(0, 8)} · ${ev.tools || 0} 个工具`;
+  else if (kind === "status") detail = LABEL[ev.status] || ev.status;
+  else if (kind === "failed") detail = ev.error || "";
+  else if (kind === "phase_start") detail = ev.resume ? "恢复会话" : "新会话";
+  else if (kind === "thinking") detail = "…";
+
+  const div = document.createElement("div");
+  div.className = "ev " + cls;
+  div.innerHTML = `<span class="t">${ev.ts ? clock(ev.ts) : ""}</span>` +
+    `<span class="k">${esc(KIND[kind] || kind)}</span>` +
+    `<span class="d">${esc(detail)}</span>`;
+  log.appendChild(div);
+  if (near) log.scrollTop = log.scrollHeight;
+
+  if (["done", "failed", "awaiting_approval"].includes(kind)) {
+    loadJobs(); loadSlots();
+    setTimeout(renderDetail, 400);
+  }
+}
+
+function openStream(id) {
+  if (es) { es.close(); es = null; }
+  es = new EventSource(`/api/jobs/${encodeURIComponent(id)}/stream`);
+  es.onmessage = (m) => { try { addEvent(JSON.parse(m.data)); } catch (e) {} };
+  es.addEventListener("close", () => { es.close(); es = null; });
+  es.onerror = () => { /* browser retries on its own */ };
+}
+
+$("form").onsubmit = async (e) => {
+  e.preventDefault();
+  $("formerr").textContent = "";
+  $("submit").disabled = true;
+  try {
+    const d = await api("/api/jobs", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: $("f-title").value.trim(),
+        idea: $("f-idea").value.trim(),
+        track: $("f-track").value,
+      }),
+    });
+    $("f-title").value = ""; $("f-idea").value = "";
+    await loadJobs(); select(d.id); loadSlots();
+  } catch (e) {
+    $("formerr").textContent = e.message;
+  } finally { $("submit").disabled = false; }
+};
+
+$("refresh").onclick = () => { loadJobs(); loadSlots(); if (sel) renderDetail(); };
+
+loadSlots(); loadJobs();
+timer = setInterval(() => { loadSlots(); loadJobs(); }, 15000);
+</script>
+</body>
+</html>
