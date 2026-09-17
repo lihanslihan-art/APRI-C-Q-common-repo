@@ -1,0 +1,8 @@
+# Generated: rebuild with `python build_db.py` (7 s, 173 MB)
+corpus.db
+corpus.db.tmp
+
+# Local virtualenv
+.venv/
+__pycache__/
+*.pyc

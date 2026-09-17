@@ -1,0 +1,35 @@
+# Patent corpus search service (plan B).
+#
+# Install as a systemd *user* unit, matching the pattern already used on this
+# host (see wechat-claude.service): explicit absolute paths, because nvm's
+# node/python are not on systemd's default PATH.
+#
+#   cp deploy/patent-corpus-web.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now patent-corpus-web
+#   systemctl --user status patent-corpus-web
+#   journalctl --user -u patent-corpus-web -f
+#
+# Requires `loginctl enable-linger admin` so the unit survives logout.
+
+[Unit]
+Description=Patent corpus search service (IEEE 802 + Wi-Fi 8 TGbn, SQLite FTS5)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/admin/APRI-C-Q-common-repo/patent-corpus-web
+Environment=CORPUS_DB=/home/admin/APRI-C-Q-common-repo/patent-corpus-web/corpus.db
+ExecStart=/home/admin/APRI-C-Q-common-repo/patent-corpus-web/.venv/bin/uvicorn \
+    app:app --host 127.0.0.1 --port 3014 --workers 1
+Restart=on-failure
+RestartSec=5
+
+# The service only ever reads the corpus and its own database.
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target
