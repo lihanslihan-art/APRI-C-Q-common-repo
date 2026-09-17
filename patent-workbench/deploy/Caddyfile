@@ -1,7 +1,13 @@
 # TLS reverse proxy for the patent workbench.
 #
 #   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
-#   sudo systemctl reload caddy
+#   sudo systemctl restart caddy
+#
+# RESTART, not reload. `admin off` below turns off Caddy's admin API on
+# localhost:2019, and `systemctl reload caddy` works by POSTing the new config
+# to exactly that API -- so reload fails with "connection refused" while the
+# config itself validates fine. Keeping the admin API off is worth that:
+# it is one less local endpoint that can rewrite this proxy's configuration.
 #
 # Why a proxy instead of just binding uvicorn to 0.0.0.0: without TLS the
 # HTTP Basic credentials travel in cleartext, and this endpoint can start an
@@ -21,8 +27,18 @@
 	auto_https off
 }
 
-# Public HTTPS endpoint. Port 8443 because xray owns 443 on this host.
-:8443 {
+# Public HTTPS endpoint. Two ports, both serving TLS:
+#
+#   8080  the one that works today. Probed the Aliyun security group port by
+#         port from the host itself (curl to the instance's own public IP does
+#         traverse the group) and 8080 was the only candidate already allowed,
+#         so using it needs no console change. Unconventional for TLS, but the
+#         scheme is in the URL and nothing cares.
+#   8443  the conventional choice, kept ready for when 8443 is opened in the
+#         security group. Until then it listens and times out from outside.
+#
+# 443 is not an option: xray (the VPN) owns it on this host.
+:8080, :8443 {
 	tls /etc/caddy/certs/workbench.crt /etc/caddy/certs/workbench.key
 
 	# The workbench reads X-Forwarded-For (uvicorn --proxy-headers
