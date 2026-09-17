@@ -1,7 +1,8 @@
 # patent-workbench
 
-专利起草工作台。**方案 D,已部署并端到端跑通**(端口 3015,仅回环)。
-上线前请先读「隔离」一节:容器化仍是待办,在那之前不要把端口放到回环之外。
+专利起草工作台。**方案 D,已部署并端到端跑通**。
+公网入口 `https://47.250.10.235:8443`,应用本身只绑 127.0.0.1:3015,
+经 Caddy 做 TLS 反向代理。见「公网访问」一节。
 
 这是提案四个方案里的 D:**不重写提示词,而是用 headless Claude Code 原样驱动上游那套技能**。
 上游 `wifi_patent_skill/SKILL.md` 有 801 行起草知识,本服务一行都没有复制——
@@ -69,20 +70,55 @@ Read/Write/Edit/Glob/Grep。`TOOLS_DENIED` 另外挡掉 git、gh、sudo、system
 2. `--permission-prompts none`,白名单之外的一切直接拒绝,而不是挂在那里等一个没人会给的回答;
 3. `--max-budget-usd`,每个阶段的硬性成本上限。
 
-**真正的隔离是把 Agent 放进容器**,只挂载运行目录可写、语料只读、无宿主网络。
-这台机器上 Docker 可用,这是本服务的下一步,在那之前**不要把端口放到回环之外**。
+### 真正起作用的那一层:内核级文件系统限制
 
-### 为什么不像 patent-corpus-web 那样开到公网
+工具白名单挡不住 `python3 -c`,所以真正的边界是**内核拒绝写入**。
+本服务是**系统级 systemd unit**(`User=admin`),整个文件系统只读,
+只挖三个可写洞:
 
-语料服务是只读检索,泄露凭据的后果是内容暴露。这个服务会启动能运行解释器、能写文件的
-Agent 会话。一个能做到这件事的 HTTP 端点如果暴露在公网,凭据一旦泄露就等于这台机器上的
-远程代码执行——而这台机器同时跑着 VPN 和另外六个服务,而且凭据走的是明文 HTTP。
+```
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=<本服务目录>          run 目录、作业库、缓存
+ReadWritePaths=/home/admin/.claude   claude CLI 的会话状态
+ReadWritePaths=/home/admin/.claude.json
+```
 
-所以 systemd unit 写死 `--host 127.0.0.1`。要用就开隧道:
+**实测结果**(10 项探针):`~/.ssh`、`~/.bashrc`、`ai_patent_experiments`、
+`patent-corpus-web`、`sg-compliance`、`/etc`、`/usr/local/bin` 全部只读;
+本服务目录和 `~/.claude` 可写;上游语料仍可读。
+被攻陷的 Agent 仍能读这个用户的文件、仍能访问网络,但**改不了自己运行目录以外的任何东西**。
+
+### 为什么必须是系统级 unit——这一点差点漏掉
+
+本机其他服务都是用户级 unit,这个服务最初也是。**但用户级 unit 里上面那套沙箱静默失效。**
+这台机器是 Ubuntu 24.04,`kernel.apparmor_restrict_unprivileged_userns=1`,
+用户级 service manager 建不出这些指令需要的挂载命名空间。
+
+诡异的是它只是部分失效:`ProtectSystem=strict` 看起来生效了(挡住了 `/etc` 和 `/usr`),
+而 `ProtectHome`、`ReadOnlyPaths`、`InaccessiblePaths` 全是空操作——
+`~/.ssh`、`~/.bashrc` 和每个同级项目都照样可写。**只看有没有报错会以为配好了。**
+改成系统级 unit 加 `User=admin`,同样的指令由内核强制执行。
+
+如果你要加新的沙箱指令,**用探针实测,不要假设**:
 
 ```bash
-ssh -L 3015:127.0.0.1:3015 admin@<host>
+sudo systemd-run --quiet --wait --pipe -p User=admin \
+  -p ProtectSystem=strict -p ProtectHome=read-only \
+  -p ReadWritePaths=<本目录> /bin/bash -c 'echo x > /home/admin/.bashrc && echo 可写 || echo 只读'
 ```
+
+### 缓存目录必须重定向
+
+matplotlib 默认往 `~/.config/matplotlib` 写字体缓存,`~/.cache` 同理,
+沙箱下这两处只读,交底书插图会在最不该失败的时候失败。unit 里把
+`MPLCONFIGDIR`、`XDG_CACHE_HOME`、`XDG_CONFIG_HOME` 全部指到本服务目录下的
+`.cache/`,并已实测沙箱内 matplotlib 能正常出图。
+
+### 仍未做到的
+
+**Agent 能读这个用户的全部文件,也能自由访问网络。** 写入被限死了,读取和外联没有。
+要把这两样也管住得上容器或网络命名空间,那是下一步。
 
 ---
 
@@ -148,6 +184,49 @@ HTTP 层一律 404)、作业状态机。
 要手动跑一次就把 `.env` 的 `AGENT_MODEL` 临时换成
 `claude-haiku-4-5-20251001`、`BUDGET_SCREEN_USD=1`,提交一个简短想法。
 
+## 公网访问
+
+```
+https://47.250.10.235:8443/
+```
+
+凭据是 `.env` 里的 `AUTH_USER` / `AUTH_PASS`(HTTP Basic)。
+
+| 层 | 配置 |
+|---|---|
+| 应用 | uvicorn 绑 `127.0.0.1:3015`,**从不**绑 0.0.0.0 |
+| 代理 | Caddy 监听 `:8443`,TLS 终结后转发到回环 |
+| 端口选择 | 用 8443 是因为本机 443 被 xray(VPN)占着 |
+| 证书 | **自签**,SAN 含 `IP:47.250.10.235` |
+| 客户端 IP | Caddy 设 `X-Forwarded-For`,uvicorn 用 `--proxy-headers --forwarded-allow-ips 127.0.0.1` 采信,所以按 IP 的失败节流看到的是真实来源 |
+
+安装:
+
+```bash
+sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+```
+
+**还需要在阿里云控制台放行 8443**(入方向 TCP)。实测对照:3014、3013、3011
+从公网可达,8443 超时——超时而非拒绝连接,正是安全组丢包的特征。
+
+### 关于证书
+
+这台机器没有域名,而 Let's Encrypt 不给裸 IP 签发,所以是自签证书。
+**这解决了凭据被嗅探的问题**(明文 Basic 认证的主要风险),但**不解决服务器身份认证**:
+浏览器会警告一次,链路上的攻击者理论上仍可 MITM。
+
+**把任意域名指向这个 IP,就能换成真证书**,改两行:Caddyfile 里把 `:8443`
+换成 `your.domain:8443`,删掉 `tls` 那行让 Caddy 自动签发,并放行 80 端口做 ACME 校验
+(80 当前空闲)。
+
+### 想进一步收紧
+
+- **IP 白名单**:Caddy 里加 `@allowed remote_ip <你的IP>`,只放行已知来源。
+  如果你的出口 IP 固定,这是性价比最高的一道。
+- **改回仅隧道访问**:停掉 caddy,用 `ssh -L 8443:127.0.0.1:3015 admin@47.250.10.235`,
+  暴露面归零。
+
 ## API
 
 | 方法 | 路径 | 说明 |
@@ -192,10 +271,18 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements-agent.txt      # Agent 要用的产物构建库
 
 cp .env.example .env && chmod 600 .env               # 填两套凭据
-cp deploy/patent-workbench.service ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now patent-workbench
+# SYSTEM unit, not --user: the sandbox is a no-op in a user unit on this
+# host (see the isolation section).
+sudo cp deploy/patent-workbench.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now patent-workbench
+
+# TLS reverse proxy for public access
+sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+sudo systemctl reload caddy
 ```
+
+日志用 `sudo journalctl -u patent-workbench -f`(系统级,不是 `--user`)。
 
 `.env` 要填两套凭据:本服务自己的 Basic 认证,以及它调用语料服务所用的
 `CORPUS_AUTH`(格式 `user:password`,作为环境变量传给 Agent,由 `corpus.py` 读取)。
@@ -216,7 +303,11 @@ unit 里 PATH 写死绝对路径:Agent 子进程需要 nvm 的 node 才能跑 cl
 **上游配套的公开知识库仓库未随镜像分发**,所以侦察类技能在这里跑不了。
 本服务只驱动起草链路,不驱动情报侦察链路。
 
-**Bash 白名单不是沙箱**,见「隔离」一节。
+**Bash 白名单不是沙箱**,见「隔离」一节。真正的边界是内核级写入限制,
+但 Agent 的**读取和外联仍不受限**。
+
+**自签证书不认证服务器身份。** 通道是加密的,凭据不会被嗅探,
+但链路上的攻击者理论上仍可 MITM。指一个域名过来就能换真证书。
 
 **无人值守意味着没人能回答 Agent 的追问。** 提示词要求它遇到技能中需要澄清的地方
 按最合理假设继续,并把假设写进产物。所以产出的 `REPORT.md` 里那份假设清单要认真读。

@@ -1,41 +1,78 @@
-# Patent drafting workbench (plan D).
+# Patent drafting workbench (plan D). SYSTEM unit, runs as admin.
 #
-#   cp deploy/patent-workbench.service ~/.config/systemd/user/
-#   systemctl --user daemon-reload
-#   systemctl --user enable --now patent-workbench
-#   journalctl --user -u patent-workbench -f
+#   sudo cp deploy/patent-workbench.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now patent-workbench
+#   sudo journalctl -u patent-workbench -f
 #
-# LOOPBACK ONLY, ON PURPOSE. Unlike patent-corpus-web, this service spawns
-# agent sessions that can run an interpreter and write files. An HTTP endpoint
-# that does that must not be reachable from the internet: if the Basic
-# credentials leak, and they travel in cleartext, the endpoint becomes remote
-# code execution as this user on a host that also runs the VPN and six other
-# services. Reach it over an SSH tunnel instead:
+# Why a system unit and not a --user one, which is what everything else on
+# this host uses: the sandbox below is the only thing standing between a
+# compromised agent session and the rest of the machine, and in a user unit
+# it silently does nothing. This host runs Ubuntu 24.04 with
+# kernel.apparmor_restrict_unprivileged_userns=1, so the user service manager
+# cannot create the mount namespace these directives need. ProtectSystem
+# appeared to work (it blocked /etc and /usr) while ProtectHome, ReadOnlyPaths
+# and InaccessiblePaths were all no-ops: ~/.ssh, ~/.bashrc and every sibling
+# project stayed writable. Measured, not assumed. As a system unit with
+# User=admin the same directives are enforced by the kernel.
 #
-#   ssh -L 3015:127.0.0.1:3015 admin@<host>
-#
-# Do not change --host to 0.0.0.0 without first putting the agent in a
-# container. See the README's isolation section.
+# The app listens on LOOPBACK ONLY. Public access goes through the Caddy TLS
+# reverse proxy (see deploy/Caddyfile), never by pointing uvicorn at 0.0.0.0:
+# the proxy terminates TLS so the Basic credentials are not sniffable, and the
+# app keeps exactly one ingress path.
 
 [Unit]
 Description=Patent drafting workbench (headless Claude Code driving the upstream skill)
-After=network-online.target patent-corpus-web.service
-Wants=patent-corpus-web.service
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
+User=admin
+Group=admin
 WorkingDirectory=/home/admin/APRI-C-Q-common-repo/patent-workbench
 EnvironmentFile=/home/admin/APRI-C-Q-common-repo/patent-workbench/.env
 # The agent subprocess needs nvm's node for the claude CLI and the service
 # venv for python3; systemd's default PATH has neither.
 Environment=PATH=/home/admin/APRI-C-Q-common-repo/patent-workbench/.venv/bin:/home/admin/.nvm/versions/node/v24.16.0/bin:/usr/local/bin:/usr/bin:/bin
 Environment=HOME=/home/admin
+# matplotlib and other tools cache under ~/.config and ~/.cache, which the
+# sandbox makes read-only. Point them inside the service's own writable tree
+# or figure generation fails with a permission error at the worst moment.
+Environment=MPLCONFIGDIR=/home/admin/APRI-C-Q-common-repo/patent-workbench/.cache/matplotlib
+Environment=XDG_CACHE_HOME=/home/admin/APRI-C-Q-common-repo/patent-workbench/.cache
+Environment=XDG_CONFIG_HOME=/home/admin/APRI-C-Q-common-repo/patent-workbench/.cache/config
 ExecStart=/home/admin/APRI-C-Q-common-repo/patent-workbench/.venv/bin/uvicorn \
-    app:app --host 127.0.0.1 --port 3015 --workers 1
+    app:app --host 127.0.0.1 --port 3015 --workers 1 --proxy-headers \
+    --forwarded-allow-ips 127.0.0.1
 Restart=on-failure
 RestartSec=5
 
+# ---- blast radius ----
+# The agent can run an interpreter, so an allowlist of Bash prefixes cannot
+# stop `python3 -c`. What stops it is the kernel refusing the write.
+# Everything read-only, then three holes: this service's own directory (run
+# dirs, job database) and the Claude CLI's config and session state.
+# Verified: ~/.ssh, ~/.bashrc, the sibling projects, /etc and /usr all
+# read-only; the upstream corpus still readable.
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/admin/APRI-C-Q-common-repo/patent-workbench
+ReadWritePaths=/home/admin/.claude
+ReadWritePaths=/home/admin/.claude.json
+PrivateTmp=true
 NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RemoveIPC=true
+LockPersonality=true
+# Two concurrent agent sessions at ~283 MB each, plus the service. A runaway
+# run hits this ceiling instead of the OOM killer picking another service.
+MemoryMax=1200M
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target

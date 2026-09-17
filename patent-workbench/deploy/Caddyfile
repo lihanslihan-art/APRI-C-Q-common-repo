@@ -1,0 +1,42 @@
+# TLS reverse proxy for the patent workbench.
+#
+#   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+#
+# Why a proxy instead of just binding uvicorn to 0.0.0.0: without TLS the
+# HTTP Basic credentials travel in cleartext, and this endpoint can start an
+# agent session that runs an interpreter. Sniffable credentials on that
+# endpoint is remote code execution waiting to happen. The app therefore
+# stays on loopback and this is the only public ingress.
+#
+# The certificate is self-signed because the host has no domain name and
+# Let's Encrypt does not issue for bare IP addresses. That still encrypts the
+# channel, which is what protects the credentials; it does not authenticate
+# the server, so a browser will warn once and an on-path attacker could still
+# MITM. Point a domain at this IP and the fix is two lines: replace the
+# address with the domain and swap `tls` for Caddy's automatic HTTPS.
+
+{
+	admin off
+	auto_https off
+}
+
+# Public HTTPS endpoint. Port 8443 because xray owns 443 on this host.
+:8443 {
+	tls /etc/caddy/certs/workbench.crt /etc/caddy/certs/workbench.key
+
+	# The workbench reads X-Forwarded-For (uvicorn --proxy-headers
+	# --forwarded-allow-ips 127.0.0.1), so its per-IP auth throttle sees the
+	# real client rather than counting every failure against 127.0.0.1.
+	reverse_proxy 127.0.0.1:3015 {
+		header_up X-Forwarded-Proto https
+	}
+
+	# Long agent runs stream Server-Sent Events; do not buffer or time them out.
+	encode gzip
+
+	log {
+		output file /var/log/caddy/workbench.log
+		format json
+	}
+}

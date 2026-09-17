@@ -9,3 +9,6 @@ runs/
 .venv/
 __pycache__/
 *.pyc
+
+# Caches redirected here because the sandbox makes ~/.cache read-only
+.cache/
