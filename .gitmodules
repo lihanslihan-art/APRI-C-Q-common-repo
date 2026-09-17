@@ -1,0 +1,3 @@
+[submodule "upstream/ai_patent_experiments"]
+	path = upstream/ai_patent_experiments
+	url = https://github.com/lihanslihan-art/ai_patent_experiments_mirror.git
