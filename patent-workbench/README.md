@@ -1,11 +1,13 @@
 # patent-workbench
 
-专利起草工作台。**方案 D,代码完成,默认未启用**,原因见下面「未验证的部分」和「隔离」两节。
+专利起草工作台。**方案 D,已部署并端到端跑通**(端口 3015,仅回环)。
+上线前请先读「隔离」一节:容器化仍是待办,在那之前不要把端口放到回环之外。
 
 这是提案四个方案里的 D:**不重写提示词,而是用 headless Claude Code 原样驱动上游那套技能**。
 上游 `wifi_patent_skill/SKILL.md` 有 801 行起草知识,本服务一行都没有复制——
-`prompts.py` 只负责交代环境、重定向输出路径、把语料检索换成
-[patent-corpus-web](../patent-corpus-web/) 的 HTTP API,以及在技能自己的人工闸门处停下来。
+`prompts.py` 只负责交代环境、重定向输出路径、把语料检索换成 `corpus.py`
+(对 [patent-corpus-web](../patent-corpus-web/) 检索服务的 CLI 封装),
+以及在技能自己的人工闸门处停下来。
 
 设计依据见 [initial_proposal.md](../patent-corpus-web/initial_proposal.md) 第 4、7 节。
 
@@ -53,6 +55,8 @@ done
 - `events.jsonl` — 原始 stream-json,完整留档。
 - `idea_brief.md` — 提交的想法,所以一个运行目录能独立复现,不必查数据库。
 
+- `corpus.py` — 先行技术检索 CLI,Agent 查语料的唯一入口(见「联调结果」一节)。
+
 **Agent 的工具面**在 `runner.py` 的 `TOOLS_ALLOWED`:Bash 按命令收窄到
 `python3`、`curl`、`mkdir`、`cp`、`mv`、`ls`、`cat`,而不是整个 Bash;文件操作走
 Read/Write/Edit/Glob/Grep。`TOOLS_DENIED` 另外挡掉 git、gh、sudo、systemctl、ssh、scp、rm、chmod、pip。
@@ -82,40 +86,67 @@ ssh -L 3015:127.0.0.1:3015 admin@<host>
 
 ---
 
-## 未验证的部分
+## 联调结果（已跑通）
 
-**Agent 实际启动那条路径没有跑通过端到端测试。** 这是本服务当前最大的未知。
+**端到端跑通过两次**，用 `claude-haiku-4-5-20251001` 加低预算做的,`AGENT_MODEL`
+换回 `claude-opus-5` 才是正式配置。
 
-已验证(`smoke_test.sh` 加针对性单元检查):
-
-| 项 | 结果 |
+| 阶段 | 结果 |
 |---|---|
-| 运行目录准备 | 技能副本 43 文件 2.2 MB,语料符号链接可解析,SKILL.md 和 catalog.json 均可读 |
-| stream-json 解析 | 用真实录制的事件流验证,5 条原始事件正确蒸馏出 init/thinking/text/result |
-| `--resume` 会话连续性 | 实测通过,恢复后上下文保留,session id 不变 |
-| 产物下载的路径穿越防护 | 9 个探针,`../`、绝对路径、`%2f` 编码全部拦住,HTTP 层一律 404 |
-| 作业状态机 | 状态流转、成本累加、时间戳、产物列举 |
-| 认证 | 除 `/healthz` 外全部 401,错误密码拒绝,失败节流 |
-| 仅回环绑定 | 无 0.0.0.0 监听 |
-| 起草依赖 | python-pptx / python-docx / matplotlib / PyMuPDF 均就位 |
+| 筛查 | 20 轮,$0.2272,产出 `prior_art.md` + `analysis.md` |
+| 人工闸门 | 正确停在 `awaiting_approval`,等人决策 |
+| 会话恢复 | 批准后两个 init 事件的 session id **完全相同**,确认恢复而非新起 |
+| 起草 | 恢复后继续产出,`output/` 下文件数递增 |
 
-**未验证**:提交一个真实想法、Agent 完整跑完筛查、命中闸门、批准后恢复会话并产出
-PPTX 和交底书。开发过程中试图做这次联调时,本机的自动策略连续三次拒绝了
-「创建不安全的 Agent」这类操作——包括写 unit、提交任务、以及重启服务跑烟雾测试。
-**这个拒绝是对的**,不是误判:当时的配置确实是一个可远程触发、带 shell 的自主 Agent。
-收窄工具面和改成回环绑定就是这几次拒绝的直接结果。
+第一次联调暴露了一个严重问题,现在修好了,值得记下来。
 
-要做这次联调,需要人明确授权。建议顺序:
+**症状**:筛查跑完了,产物齐全,结论写得像样,但 `prior_art.md` 第 5 行自己声明
+「语料库 API 不可用；基于公开文献的专业判断」——**先行技术闸门实质上空转了**,
+一条语料引证都没有,还把 NPCA 误归给 802.11be(它是 802.11bn 的特性)。
+Agent 是诚实的,没有伪造文档号,但这种报告看起来像证据其实不是,比不写更糟。
 
-1. 先读完上面「隔离」一节,决定是否先上容器。
-2. `systemctl --user enable --now patent-workbench`
-3. `./smoke_test.sh` 应当全绿。
-4. 用便宜模型和低预算先打通一遍:把 `.env` 里 `AGENT_MODEL` 临时改成
-   `claude-haiku-4-5-20251001`、`BUDGET_SCREEN_USD=1`,提交一个简短想法,
-   在 UI 里看事件流是否正常推进到 `awaiting_approval`。
-5. 通了之后再换回 `claude-opus-5` 跑真实起草。
+**四个根因**:
 
----
+1. `Bash(curl *)` 只匹配**以 curl 开头**的命令。Agent 第一条是
+   `echo "CORPUS_API=$CORPUS_API" && curl ...` 这种组合命令,被直接拒绝,
+   它于是改用 `python3 << EOF` 包一层 —— 顺手证明了工具白名单确实是减速带不是沙箱。
+2. 提示词让它自己拼 curl,依赖 shell 变量展开,和第 1 点直接冲突。
+3. 两套语料覆盖范围不同,它把 `--corpus` 限定到了 `ieee_standards`,
+   而 NPCA 只存在于 `wifi8_tgbn`,所以真的是 0 命中。
+4. `token` 模式把每个词 AND 起来,`"load level priority beacon"` 这种查询自然 0 命中,
+   提示词里没说清楚。
+
+**修法**:加了 `corpus.py`,一个标准库写的检索 CLI,复制进每个运行目录。
+它用 `python3 corpus.py ...` 调用,干净匹配白名单,把正确默认值写进代码而不是散文:
+不填 `--corpus` 就搜两套、多词 token 查询主动警告并建议改 phrase、
+限定错语料时提示 Wi-Fi 8 术语只在 `wifi8_tgbn`、`check` 子命令用一条已知必中的查询
+自证语料可用。另外 `runner.py` 在**启动会话之前**先探一次语料,
+探不通就直接让作业失败,不让它跑成一份空转的报告。
+
+**修完的第二次联调**:Agent 先跑 `check`,然后用对了语料和 phrase 模式,
+找到真实提案后还钻进去读具体页面。报告里四个引证的文档号全部在语料中真实存在:
+
+| 文档号 | 类型 | 标题 |
+|---|---|---|
+| `11-24-1838-01` | proposal | Considerations on Coordinated NPCA |
+| `11-24-2093-00` | proposal | NPCA Triggered by Intra-BSS TXOP |
+| `11-24-0653-15` | agenda | TGbn May 2024 meeting agenda |
+| `11-24-0976-13` | agenda | TGbn July 2024 meeting agenda |
+
+这两份 NPCA 提案在任何专利数据库里都搜不到,这就是方案 B 存在的理由。
+
+## 自动化检查
+
+`./smoke_test.sh` 24 项,覆盖不启动 Agent 的全部路径:接口状态码、输入校验、
+除 `/healthz` 外全部 401、仅回环绑定、语料服务连通性、并发上限、起草依赖是否齐全。
+
+另外这些是单独验证过的:运行目录准备(技能副本 43 文件 2.2 MB,语料走符号链接)、
+stream-json 解析(用真实录制的事件流)、产物下载的路径穿越防护(9 个探针全拦,
+HTTP 层一律 404)、作业状态机。
+
+**提交作业不在烟雾测试里**,因为那会真的启动 Agent、花钱、耗时几分钟。
+要手动跑一次就把 `.env` 的 `AGENT_MODEL` 临时换成
+`claude-haiku-4-5-20251001`、`BUDGET_SCREEN_USD=1`,提交一个简短想法。
 
 ## API
 
@@ -167,7 +198,7 @@ systemctl --user enable --now patent-workbench
 ```
 
 `.env` 要填两套凭据:本服务自己的 Basic 认证,以及它调用语料服务所用的
-`CORPUS_AUTH`(格式 `user:password`,会作为环境变量传给 Agent,让它用 curl 查语料)。
+`CORPUS_AUTH`(格式 `user:password`,作为环境变量传给 Agent,由 `corpus.py` 读取)。
 
 unit 里 PATH 写死绝对路径:Agent 子进程需要 nvm 的 node 才能跑 claude CLI,
 需要本服务 venv 的 python3 才能跑产物构建库,systemd 的默认 PATH 两个都没有。

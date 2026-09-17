@@ -63,7 +63,7 @@ assert "corpus search service reachable" "$reach" "plan B dependency"
 cc=$(curl -s -u "$AUTH" "$B/api/slots" | python3 -c 'import json,sys; print(json.load(sys.stdin)["max_concurrent"])')
 assert "concurrency capped at 2" "$([ "$cc" = 2 ] && echo true || echo false)" "max_concurrent=$cc"
 deps=$("$HERE/.venv/bin/python" -c '
-import importlib
+import importlib.util
 missing=[m for m in ("pptx","docx","matplotlib","fitz") if not importlib.util.find_spec(m)]
 print("true" if not missing else "false:"+",".join(missing))' 2>/dev/null)
 assert "agent-side builder deps present" "${deps%%:*}" "python-pptx/docx/matplotlib/PyMuPDF"

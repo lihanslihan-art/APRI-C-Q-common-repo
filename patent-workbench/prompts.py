@@ -8,8 +8,9 @@ create a second copy to keep in sync. These prompts only:
 
   - point the agent at the skill and tell it to follow the skill's own steps,
   - redirect the skill's hardcoded output paths into this run's output/ dir,
-  - redirect the skill's prior-art corpus search from its CLI scripts to the
-    corpus search HTTP API (the plan B service),
+  - redirect the skill's prior-art corpus search onto corpus.py, the CLI
+    wrapper around the plan B search service, and spell out the two traps
+    the first integration run fell into (wrong corpus filter, token-mode AND),
   - state the sandbox rules, and
   - enforce the stop at the skill's own human gate.
 
@@ -38,33 +39,59 @@ _SANDBOX = """
 """
 
 _CORPUS_API = """
-## 先行技术语料检索（用 HTTP API，不要用技能里的 CLI 脚本）
+## 先行技术语料检索（只用 `corpus.py`，不要自己拼 curl）
 
-技能 Step 1 让你跑 `references/ieee_standards/scripts/search.py` 和
-`references/wifi8_tgbn/scripts/search.py`。**这里改用一个 HTTP 服务**，
-同样的语料（IEEE 802 标准 55 份 + Wi-Fi 8/TGbn 工作组文档 2767 份，共 47077 页），
-但单次查询从约 900 ms 降到约 20 ms，且支持批量。
+技能 Step 1 让你跑 `references/*/scripts/search.py`。**这里改用当前目录下的
+`corpus.py`**，背后是同一批语料的检索服务：IEEE 802 标准 55 份加
+Wi-Fi 8 / TGbn 工作组文档 2767 份，共 47077 页，单次查询约 20 毫秒。
 
-环境变量 `CORPUS_API` 和 `CORPUS_AUTH` 已就绪，这样调用：
+**第一步必须是自检。** 先跑这条，确认语料真的在答话：
 
 ```bash
-curl -sG -u "$CORPUS_AUTH" "$CORPUS_API/api/search" \\
-  --data-urlencode 'q=non-primary channel access' --data-urlencode 'mode=phrase' --data-urlencode 'limit=10'
-
-curl -s -u "$CORPUS_AUTH" "$CORPUS_API/api/doc/11-24-0209-19"
-curl -s -u "$CORPUS_AUTH" "$CORPUS_API/api/doc/11-24-0209-19/page/12"
+python3 corpus.py check
 ```
 
-`mode` 取 `token`（分词后 AND）、`phrase`（精确短语）、`boolean`（支持 `AND OR NOT ( )`）、
-`prefix`（前缀）。可加筛选 `corpus`（`ieee_standards` / `wifi8_tgbn`）、`kind`
-（`sfd` `pdt` `cr` `proposal` `minutes` …）、`topic`、`ballot`、`year`。
-完整接口说明在 `$CORPUS_API/openapi.json`。
+`USABLE: True` 才能继续。用法：
 
-**每条命中返回的 `first_disclosed` 是首次公开日期（r0 版本），不是最新修订日期。**
-判定先行技术只能用前者。引用时写工作组文档号。
+```bash
+python3 corpus.py search npca --limit 10
+python3 corpus.py search "non-primary channel access" --mode phrase
+python3 corpus.py search npca --kind cr --ballot LB291
+python3 corpus.py doc 11-24-0209-19          # 元数据 + 主题 + 目录
+python3 corpus.py page 11-24-0209-19 12      # 单页全文
+python3 corpus.py facets                     # 可用的 kind / topic / ballot / year
+```
 
-技能要求「任何 802.11bn 时代的主张都必须先查 SFD、再查 CR 文档」，这条继续遵守，
-只是换成用这个 API 查。
+### 三个容易踩的坑，先看清楚再查
+
+**一，两套语料覆盖范围不同，选错就是 0 命中。**
+
+| 语料 | 内容 |
+|---|---|
+| `ieee_standards` | 已发布的 IEEE 802 标准，Wi-Fi 7 及更早 |
+| `wifi8_tgbn` | Wi-Fi 8 / 802.11bn 工作组的公开记录 |
+
+**NPCA、MAPC、Co-TDMA、Co-SR、Co-BF、DSO、DBE、ELR、DRU、UEQM 这些 Wi-Fi 8 术语
+只存在于 `wifi8_tgbn`**，因为对应标准还没发布。`--corpus` 不填就同时搜两套，
+**默认就不要填**，除非你明确只想查已发布标准。
+
+**二，`token` 模式把每个词 AND 起来。** 所以 `search "load level priority beacon"`
+是找同时含这四个词的页面，很容易 0 命中。查一个词组要用 `--mode phrase`。
+中英混排的查询串几乎一定是 0 命中，分开查。
+
+**三,`first_disclosed` 是首次公开日期(r0 版本),不是最新修订日期。**
+判定先行技术只能用前者。引用时写工作组文档号,`corpus.py` 会连原文链接一起给你。
+
+### 一条硬规则
+
+**如果语料不可用,或者某个方向确实检索不到东西,就如实说检索不到,
+绝对不要用你自己记忆里的标准知识去补位。** 记忆里的东西无法核对、日期常错、
+条款号常错,冒充检索结果写进先行技术报告比不写更糟——它看起来像证据,其实不是。
+这套语料存在的唯一理由就是:标准组织的提案属于公开披露但专利数据库不收录,
+你记不住它们,只能查。
+
+技能要求「任何 802.11bn 时代的主张都必须先查 SFD、再查 CR 文档」,这条继续遵守,
+只是换成用 `corpus.py` 查。
 """
 
 
@@ -109,7 +136,8 @@ def screen_prompt(title: str, idea: str, track: str) -> str:
 
 具体产出两个文件：
 
-1. **`output/prior_art.md`** — 先行技术筛查报告。用上面的语料 API 检索，
+1. **`output/prior_art.md`** — 先行技术筛查报告。用 `corpus.py` 检索，
+   报告开头写明 `corpus.py check` 的结果和你实际跑过的查询，
    按技能 Step 0 的要求给出结论：`file-as-is` / `narrow-claims` /
    `major-reframe` / `abandon` 之一。每条命中要有工作组文档号、
    首次公开日期、以及技能要求的那行 `Action:`（说明独立权利要求必须加入

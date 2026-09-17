@@ -189,8 +189,13 @@ class Store:
         out = self.output_dir(job_id)
         if not out.is_dir():
             return []
+        # Build noise, not deliverables: the agent imports pptx_helpers, which
+        # leaves a .pyc behind that otherwise shows up as an artifact.
+        noise = {"__pycache__", ".ipynb_checkpoints"}
         items = []
         for p in sorted(out.rglob("*")):
+            if noise & set(p.parts) or p.suffix == ".pyc":
+                continue
             if p.is_file():
                 items.append(
                     {

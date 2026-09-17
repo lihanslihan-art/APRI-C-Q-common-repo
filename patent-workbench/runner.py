@@ -19,6 +19,7 @@ killer taking out the other services on the box.
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import os
 import shutil
@@ -144,6 +145,12 @@ def prepare_run_dir(job_id: str, title: str, idea: str, track: str) -> Path:
         link.parent.mkdir(parents=True, exist_ok=True)
         if not link.exists():
             link.symlink_to(REFERENCES, target_is_directory=True)
+
+    # The corpus CLI the agent must use for prior art. A single entry point
+    # the Bash allowlist matches cleanly beats telling the agent to compose
+    # curl commands, which the allowlist rejects the moment anything is
+    # piped or wrapped in a heredoc.
+    shutil.copyfile(BASE / "corpus_cli.py", run / "corpus.py")
 
     # The submitted idea, on disk, so a run is reproducible from its directory
     # alone without consulting the job database.
@@ -322,12 +329,63 @@ async def _run_claude(job_id: str, prompt: str, budget: float,
 # Phases
 # --------------------------------------------------------------------------
 
+def corpus_usable() -> tuple[bool, str]:
+    """Is the prior-art corpus actually answering queries?
+
+    The first integration run produced a prior-art report with no corpus
+    citations at all, because every query came back empty and the agent fell
+    back on its own recollection. A screening run without retrieval is worse
+    than no screening: it reads as evidence but is not. So this is checked
+    before the session is spawned, not discovered afterwards.
+    """
+    import urllib.error
+    import urllib.request
+    try:
+        req = urllib.request.Request(
+            CORPUS_API + "/api/search?q=npca&limit=1")
+        if CORPUS_AUTH:
+            req.add_header(
+                "Authorization",
+                "Basic " + base64.b64encode(CORPUS_AUTH.encode()).decode())
+        with urllib.request.urlopen(req, timeout=10) as r:
+            total = json.load(r).get("total", 0)
+        if total > 0:
+            return True, f"corpus answering ({total} hits for the probe query)"
+        return False, "corpus reachable but the probe query returned 0 hits"
+    except urllib.error.HTTPError as e:
+        return False, f"corpus API returned HTTP {e.code} (check CORPUS_AUTH)"
+    except (urllib.error.URLError, OSError, TimeoutError, json.JSONDecodeError) as e:
+        return False, f"corpus API unreachable at {CORPUS_API}: {e}"
+
+
+def _settle(job_id: str, status: str, **extra) -> bool:
+    """Set a terminal status unless the job was deliberately cancelled.
+
+    Cancelling kills the agent process, which makes it exit non-zero, which
+    used to land the job in `failed` and hide the fact that a person stopped
+    it on purpose. A cancellation is the final word.
+    """
+    cur = store.get(job_id)
+    if cur and cur["status"] == jobs.CANCELLED:
+        return False
+    store.set_status(job_id, status, **extra)
+    return True
+
+
 async def run_screen(job_id: str) -> None:
     job = store.get(job_id)
     if not job:
         return
     async with _sem:
         if store.get(job_id)["status"] == jobs.CANCELLED:
+            return
+        ok, why = corpus_usable()
+        if not ok:
+            store.set_status(job_id, jobs.FAILED,
+                             error=f"prior-art corpus unusable: {why}. "
+                                   "Screening without retrieval would produce a "
+                                   "report that looks like evidence and is not.")
+            _publish(job_id, {"kind": "failed", "ts": time.time(), "error": why})
             return
         store.set_status(job_id, jobs.SCREENING)
         prepare_run_dir(job_id, job["title"], job["idea"], job["track"])
@@ -338,18 +396,18 @@ async def run_screen(job_id: str) -> None:
                 BUDGET_SCREEN, resume=None,
             )
         except Exception as e:  # spawn failure, disk full, killed process
-            store.set_status(job_id, jobs.FAILED, error=f"{type(e).__name__}: {e}")
-            _publish(job_id, {"kind": "failed", "ts": time.time(), "error": str(e)})
+            if _settle(job_id, jobs.FAILED, error=f"{type(e).__name__}: {e}"):
+                _publish(job_id, {"kind": "failed", "ts": time.time(), "error": str(e)})
             return
 
     if r["error"]:
-        store.set_status(job_id, jobs.FAILED, error=r["error"])
-        _publish(job_id, {"kind": "failed", "ts": time.time(), "error": r["error"]})
+        if _settle(job_id, jobs.FAILED, error=r["error"]):
+            _publish(job_id, {"kind": "failed", "ts": time.time(), "error": r["error"]})
         return
 
-    store.set_status(job_id, jobs.AWAITING_APPROVAL, screen_summary=r["text"][:4000])
-    _publish(job_id, {"kind": "awaiting_approval", "ts": time.time(),
-                      "summary": r["text"]})
+    if _settle(job_id, jobs.AWAITING_APPROVAL, screen_summary=r["text"][:4000]):
+        _publish(job_id, {"kind": "awaiting_approval", "ts": time.time(),
+                          "summary": r["text"]})
 
 
 async def run_draft(job_id: str, note: str) -> None:
@@ -366,18 +424,18 @@ async def run_draft(job_id: str, note: str) -> None:
             r = await _run_claude(job_id, prompts.draft_prompt(note),
                                   BUDGET_DRAFT, resume=job["session_id"])
         except Exception as e:
-            store.set_status(job_id, jobs.FAILED, error=f"{type(e).__name__}: {e}")
-            _publish(job_id, {"kind": "failed", "ts": time.time(), "error": str(e)})
+            if _settle(job_id, jobs.FAILED, error=f"{type(e).__name__}: {e}"):
+                _publish(job_id, {"kind": "failed", "ts": time.time(), "error": str(e)})
             return
 
     if r["error"]:
-        store.set_status(job_id, jobs.FAILED, error=r["error"])
-        _publish(job_id, {"kind": "failed", "ts": time.time(), "error": r["error"]})
+        if _settle(job_id, jobs.FAILED, error=r["error"]):
+            _publish(job_id, {"kind": "failed", "ts": time.time(), "error": r["error"]})
         return
 
-    store.set_status(job_id, jobs.DONE)
-    _publish(job_id, {"kind": "done", "ts": time.time(), "text": r["text"],
-                      "artifacts": store.artifacts(job_id)})
+    if _settle(job_id, jobs.DONE):
+        _publish(job_id, {"kind": "done", "ts": time.time(), "text": r["text"],
+                          "artifacts": store.artifacts(job_id)})
 
 
 async def cancel(job_id: str) -> bool:
