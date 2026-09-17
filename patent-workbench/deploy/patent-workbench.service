@@ -1,0 +1,41 @@
+# Patent drafting workbench (plan D).
+#
+#   cp deploy/patent-workbench.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now patent-workbench
+#   journalctl --user -u patent-workbench -f
+#
+# LOOPBACK ONLY, ON PURPOSE. Unlike patent-corpus-web, this service spawns
+# agent sessions that can run an interpreter and write files. An HTTP endpoint
+# that does that must not be reachable from the internet: if the Basic
+# credentials leak, and they travel in cleartext, the endpoint becomes remote
+# code execution as this user on a host that also runs the VPN and six other
+# services. Reach it over an SSH tunnel instead:
+#
+#   ssh -L 3015:127.0.0.1:3015 admin@<host>
+#
+# Do not change --host to 0.0.0.0 without first putting the agent in a
+# container. See the README's isolation section.
+
+[Unit]
+Description=Patent drafting workbench (headless Claude Code driving the upstream skill)
+After=network-online.target patent-corpus-web.service
+Wants=patent-corpus-web.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/admin/APRI-C-Q-common-repo/patent-workbench
+EnvironmentFile=/home/admin/APRI-C-Q-common-repo/patent-workbench/.env
+# The agent subprocess needs nvm's node for the claude CLI and the service
+# venv for python3; systemd's default PATH has neither.
+Environment=PATH=/home/admin/APRI-C-Q-common-repo/patent-workbench/.venv/bin:/home/admin/.nvm/versions/node/v24.16.0/bin:/usr/local/bin:/usr/bin:/bin
+Environment=HOME=/home/admin
+ExecStart=/home/admin/APRI-C-Q-common-repo/patent-workbench/.venv/bin/uvicorn \
+    app:app --host 127.0.0.1 --port 3015 --workers 1
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

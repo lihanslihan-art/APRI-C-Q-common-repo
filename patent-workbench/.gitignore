@@ -1,0 +1,11 @@
+# Local credentials (see .env.example)
+.env
+
+# Per-job run directories: agent output, event logs, job database.
+# These hold idea-specific content, which upstream's rules keep out of git.
+runs/
+
+# Local virtualenv (293 MB: matplotlib + PyMuPDF)
+.venv/
+__pycache__/
+*.pyc
