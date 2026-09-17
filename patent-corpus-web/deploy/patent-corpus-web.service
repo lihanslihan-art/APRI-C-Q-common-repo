@@ -20,8 +20,13 @@ After=network-online.target
 Type=simple
 WorkingDirectory=/home/admin/APRI-C-Q-common-repo/patent-corpus-web
 Environment=CORPUS_DB=/home/admin/APRI-C-Q-common-repo/patent-corpus-web/corpus.db
+# HTTP Basic credentials. The service refuses to start if these are unset,
+# so a missing .env fails loudly instead of opening the endpoint.
+EnvironmentFile=/home/admin/APRI-C-Q-common-repo/patent-corpus-web/.env
+# Bound to every interface: this port is published through the Aliyun
+# security group, so auth is the only thing in front of it.
 ExecStart=/home/admin/APRI-C-Q-common-repo/patent-corpus-web/.venv/bin/uvicorn \
-    app:app --host 127.0.0.1 --port 3014 --workers 1
+    app:app --host 0.0.0.0 --port 3014 --workers 1 --proxy-headers
 Restart=on-failure
 RestartSec=5
 
