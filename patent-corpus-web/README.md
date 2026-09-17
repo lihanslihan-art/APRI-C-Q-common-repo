@@ -24,7 +24,7 @@ python3 -m venv .venv
 python build_db.py                    # 建库，约 7 秒，产出 173 MB 的 corpus.db
 .venv/bin/uvicorn app:app --host 127.0.0.1 --port 3014
 
-./smoke_test.sh                       # 21 项检查
+./smoke_test.sh                       # 29 项检查
 ```
 
 浏览器打开 <http://127.0.0.1:3014/>，交互式 API 文档在 `/docs`。
