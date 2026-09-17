@@ -23,10 +23,14 @@ Environment=CORPUS_DB=/home/admin/APRI-C-Q-common-repo/patent-corpus-web/corpus.
 # HTTP Basic credentials. The service refuses to start if these are unset,
 # so a missing .env fails loudly instead of opening the endpoint.
 EnvironmentFile=/home/admin/APRI-C-Q-common-repo/patent-corpus-web/.env
-# Bound to every interface: this port is published through the Aliyun
-# security group, so auth is the only thing in front of it.
+# Loopback only. This used to bind 0.0.0.0, which put the service's Basic
+# credentials on the public internet in the clear on every request. Public
+# access now goes through the Caddy TLS proxy on 8443
+# (patent-workbench/deploy/Caddyfile), so the credentials are encrypted and
+# this port has no public exposure at all.
 ExecStart=/home/admin/APRI-C-Q-common-repo/patent-corpus-web/.venv/bin/uvicorn \
-    app:app --host 0.0.0.0 --port 3014 --workers 1 --proxy-headers
+    app:app --host 127.0.0.1 --port 3014 --workers 1 --proxy-headers \
+    --forwarded-allow-ips 127.0.0.1
 Restart=on-failure
 RestartSec=5
 

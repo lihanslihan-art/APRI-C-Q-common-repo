@@ -138,9 +138,9 @@ chmod 600 .env
 | 项 | 值 |
 |---|---|
 | 端口 | 3014 |
-| 绑定 | 0.0.0.0，经阿里云安全组对外 |
+| 绑定 | **127.0.0.1**，经 patent-workbench 的 Caddy TLS 代理对外（8080） |
 | 认证 | HTTP Basic，见上 |
-| 传输 | **明文 HTTP，无 TLS** |
+| 传输 | **HTTPS**（自签证书，由 Caddy 终结） |
 | 进程管理 | systemd user unit，见 `deploy/` |
 | 常驻内存 | 冷启 32 MB，180 次请求后稳定在 110 MB |
 
@@ -160,9 +160,14 @@ systemd 的默认 PATH 找不到 nvm 的东西。同时 unit 用
 
 ### 关于 TLS
 
-当前是明文 HTTP，所以 **Basic 认证的凭据在链路上是可嗅探的**（base64 不是加密）。
-这是「最省事地放到公网」的直接代价。要上 TLS 需要装 caddy 或 nginx 做反代，
-但本机 443 端口被 xray 占用，反代要么换端口，要么配 xray 回落把非 VLESS 流量转给反代。
+**公网地址是 `https://47.250.10.235:8080/`**，由 patent-workbench 那边的 Caddy 统一终结 TLS，
+配置见 `../patent-workbench/deploy/Caddyfile`。浏览器里从 `http://47.250.10.235/` 的入口页点进来即可。
+
+本服务**只绑 127.0.0.1**。它原先自己绑 `0.0.0.0:3014` 跑明文，
+Basic 凭据每次请求都明文过公网；现在那个暴露已经关掉。
+
+证书是自签的（本机无域名，Let's Encrypt 不签裸 IP）。
+**有效期必须 ≤ 398 天**，否则 Chrome 报 `ERR_CERT_VALIDITY_TOO_LONG` 且无法点过。
 
 ### 内容暴露提示
 

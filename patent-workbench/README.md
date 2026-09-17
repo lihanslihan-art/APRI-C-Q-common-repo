@@ -1,7 +1,7 @@
 # patent-workbench
 
 专利起草工作台。**方案 D,已部署并端到端跑通,公网可访问**。
-浏览器直接输 `47.250.10.235` 即可(会自动跳到 HTTPS)。
+浏览器直接输 `47.250.10.235`,入口页上点链接即可。
 应用本身只绑 127.0.0.1:3015,经 Caddy 做 TLS 反向代理。见「公网访问」一节。
 
 这是提案四个方案里的 D:**不重写提示词,而是用 headless Claude Code 原样驱动上游那套技能**。
@@ -186,48 +186,60 @@ HTTP 层一律 404)、作业状态机。
 
 ## 公网访问
 
-浏览器里直接输:
+浏览器里输:
 
 ```
 47.250.10.235
 ```
 
-会自动跳到 `https://47.250.10.235:5000/`。因为是自签证书,浏览器会警告一次,
-点「继续前往」。凭据是 `.env` 里的 `AUTH_USER` / `AUTH_PASS`(HTTP Basic)。
+得到一个入口页,上面是两个服务的正确 HTTPS 链接,点进去即可。
+自签证书会提示一次,点「继续前往」。**两个服务的用户名密码是各自独立的两套。**
 
-命令行:
+| 服务 | 地址 | 凭据来源 |
+|---|---|---|
+| 起草工作台 | `https://47.250.10.235:5000/` | `patent-workbench/.env` |
+| 语料检索 | `https://47.250.10.235:8080/` | `patent-corpus-web/.env` |
+
+命令行(自签证书要 `-k`):
 
 ```bash
-curl -k -u 'apri:<密码>' https://47.250.10.235:5000/api/slots
+curl -k -u 'apri:<工作台密码>' https://47.250.10.235:5000/api/slots
+curl -k -u 'apri:<语料密码>'   https://47.250.10.235:8080/api/stats
 ```
 
-### 端口布局,以及为什么看起来很怪
+### 为什么是入口页,不是跳转
 
-443 用不了,被 xray(VPN)占着。所以把阿里云安全组逐个端口探了一遍:
-在本机 curl 实例自己的公网 IP **会经过安全组**,已放行的端口正常应答,
-未放行的**超时**(不是 connection refused)。
+443 用不了,被 xray(VPN)占着。把安全组逐个端口探过:在本机 curl 实例自己的公网 IP
+**会经过安全组**,已放行的端口正常应答,未放行的**超时**。放行的只有 **80、5000、8080**
+三个(3001、3016、3020、7000、8000、8081、8082、8090、8443、8888、9090、10000 全部超时)。
 
-放行的只有三个:**80、5000、8080**。
-(3001、3016、3020、7000、8000、8081、8082、8090、8443、8888、9090、10000 全部超时。)
+三个端口要承载四件事,光靠跳转覆盖不全,而且两种错都在测试中真实踩到过:
 
-| 端口 | 协议 | 作用 |
+| 错误现象 | 原因 |
+|---|---|
+| `Client sent an HTTP request to an HTTPS server` | 用 `http://` 打了 TLS 端口 |
+| `This site can't provide a secure connection` | 用 `https://` 打了明文端口 |
+
+任何端口只能二选一,所以只要还需要手输端口,就一定有一半的人输错。**入口页终结这件事**:
+输裸 IP、点链接,永远不用手写 scheme 和端口。这一页不涉及任何凭据,走明文 HTTP 没有问题。
+
+当前布局:
+
+| 端口 | 协议 | 内容 |
 |---|---|---|
-| 80 | 明文 HTTP | **跳转到 HTTPS** ← 规范入口 |
-| 8080 | 明文 HTTP | 跳转到 HTTPS(本服务最初发布的端口,保留兼容) |
-| 5000 | HTTPS | 应用 |
-| 8443 | HTTPS | 应用,安全组放行后即可用 |
+| 80 | 明文 HTTP | 入口页(只有链接) |
+| 5000 | HTTPS | 起草工作台 |
+| 8080 | HTTPS | 语料检索 |
+| 8443 | HTTPS | 工作台备用,安全组放行后可用 |
 
-**所有明文入口都跳转**,这是这个布局的全部意义。在浏览器默认按 HTTP 处理的端口上跑 TLS,
-会得到 `Client sent an HTTP request to an HTTPS server`,而没人该记着去补 scheme。
-第一次发布时把 TLS 挂在 8080 上就踩了这个坑。
-
-跳转那一跳是明文,但**不携带任何凭据**:浏览器此时还没被挑战,
-而且跳转由代理直接应答,根本到不了应用。
+**两个应用都只绑回环**,Caddy 是唯一的公网入口。语料服务原先自己绑 `0.0.0.0:3014`
+跑明文,凭据每次请求都明文过公网,现在已改为仅回环。
 
 ### 安装
 
 ```bash
 sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+sudo mkdir -p /etc/caddy/landing && sudo cp deploy/landing.html /etc/caddy/landing/index.html
 sudo systemctl restart caddy
 ```
 
@@ -236,24 +248,33 @@ sudo systemctl restart caddy
 "connection refused" 失败,而 `caddy validate` 却通过。保留 `admin off` 值得这点代价:
 少一个能重写本代理配置的本地接口。
 
-### 用 curl 测跳转时注意
+### 证书有个必须守的上限
 
-`curl -L` 跨端口跳转时会**主动丢弃 `Authorization` 头**(把不同端口视为不同来源),
-所以跟随跳转会拿到 401。这是 curl 的安全行为,不是服务问题。要么加
-`--location-trusted`,要么直接打 `https://47.250.10.235:5000/`。
-浏览器不受影响:它跳转后收到 `WWW-Authenticate` 挑战,弹框输凭据即可。
+**Chrome 拒绝有效期超过 398 天的证书**,报 `ERR_CERT_VALIDITY_TOO_LONG`,
+而且这条**不能点「继续前往」绕过**——地址输对了也进不去。
+第一版签成 825 天就是这个问题。重新签发时务必 `-days 397` 或更短:
 
-### 关于证书
-
-这台机器没有域名,而 Let's Encrypt 不给裸 IP 签发,所以是自签证书。
-**这解决了凭据被嗅探的问题**(明文 Basic 认证的主要风险),但**不解决服务器身份认证**:
-浏览器会警告一次,链路上的攻击者理论上仍可 MITM。
+```bash
+sudo openssl req -x509 -newkey rsa:2048 -nodes -days 397 \
+  -keyout /etc/caddy/certs/workbench.key -out /etc/caddy/certs/workbench.crt \
+  -subj "/CN=47.250.10.235" \
+  -addext "subjectAltName=IP:47.250.10.235,DNS:localhost,IP:127.0.0.1" \
+  -addext "basicConstraints=CA:FALSE" -addext "keyUsage=digitalSignature,keyEncipherment" \
+  -addext "extendedKeyUsage=serverAuth"
+sudo systemctl restart caddy
+```
 
 配置里**故意没有加 HSTS**:自签证书下 HSTS 会让浏览器不再允许点过证书警告,
 直接把所有人锁在外面。等换了真证书再加。
 
-**把任意域名指向这个 IP,就能换成真证书**。80 端口已放行且空闲,ACME HTTP-01 校验可用,
-Caddyfile 里把 `:5000` 换成 `your.domain:5000`、删掉 `tls` 那行让 Caddy 自动签发即可。
+**把任意域名指向这个 IP 就能换成真证书**,同时也免掉 398 天这个手工负担。
+80 端口已放行且现在服务入口页,ACME HTTP-01 校验可用;Caddyfile 里把 `:5000`
+换成 `your.domain:5000`、删掉 `tls` 那行让 Caddy 自动签发即可。
+
+### 用 curl 测跳转时注意
+
+`curl -L` 跨端口跳转时会**主动丢弃 `Authorization` 头**(把不同端口视为不同来源)。
+现在入口页不再跳转所以影响不大,但如果你加了跳转,记得用 `--location-trusted`。
 
 ### 想进一步收紧
 

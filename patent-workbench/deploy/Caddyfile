@@ -1,44 +1,41 @@
-# TLS reverse proxy for the patent workbench.
+# TLS reverse proxy for both patent services.
 #
 #   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+#   sudo mkdir -p /etc/caddy/landing && sudo cp deploy/landing.html /etc/caddy/landing/index.html
 #   sudo systemctl restart caddy
 #
 # RESTART, not reload. `admin off` below turns off Caddy's admin API on
 # localhost:2019, and `systemctl reload caddy` works by POSTing the new config
-# to exactly that API -- so reload fails with "connection refused" while the
-# config itself validates fine. Keeping the admin API off is worth that: it is
-# one less local endpoint that can rewrite this proxy's configuration.
+# to exactly that API -- so reload fails with "connection refused" while
+# `caddy validate` passes. Keeping the admin API off is worth that: it is one
+# less local endpoint that can rewrite this proxy's configuration.
 #
-# Why a proxy instead of just binding uvicorn to 0.0.0.0: without TLS the HTTP
-# Basic credentials travel in cleartext, and this endpoint can start an agent
-# session that runs an interpreter. Sniffable credentials there is remote code
-# execution waiting to happen. The app stays on loopback and this is the only
-# public ingress.
+# Both apps bind loopback only; this proxy is the sole public ingress. Without
+# TLS the HTTP Basic credentials travel in cleartext, and the workbench
+# endpoint can start an agent session that runs an interpreter, so sniffable
+# credentials there is remote code execution waiting to happen.
 #
 # ---------------------------------------------------------------------------
-# Port layout, and why it looks odd
+# Port layout
 #
-# 443 is unavailable: xray (the VPN) owns it on this host. So the Aliyun
-# security group was probed port by port -- curl from the instance to its own
-# public IP does traverse the group, an open port answers and a closed one
-# times out. Of everything tried, only 80, 5000 and 8080 were already open
-# (3001, 3016, 3020, 7000, 8000, 8081, 8082, 8090, 8443, 8888, 9090, 10000 all
-# timed out). That gives three ports and no way to ask for more without a
-# console change.
+# 443 is unavailable: xray (the VPN) owns it. The Aliyun security group was
+# probed port by port -- curl from the instance to its own public IP does
+# traverse the group, an open port answers and a closed one times out -- and
+# only 80, 5000 and 8080 are open. Everything else tried (3001, 3016, 3020,
+# 7000, 8000, 8081, 8082, 8090, 8443, 8888, 9090, 10000) times out.
 #
-#   :80    plain HTTP  -> redirect to HTTPS        <- the canonical entry
-#   :8080  plain HTTP  -> redirect to HTTPS
-#   :5000  HTTPS       -> the app
-#   :8443  HTTPS       -> the app (ready if the group ever opens it)
+#   :80    plain HTTP  landing page with correct https:// links
+#   :5000  HTTPS       the drafting workbench
+#   :8080  HTTPS       the corpus search service
+#   :8443  HTTPS       the workbench again, ready if the group ever opens it
 #
-# Every plain-HTTP entry point redirects, which is the whole point of this
-# layout: serving TLS on a port a browser assumes is HTTP produces "Client
-# sent an HTTP request to an HTTPS server", and nobody should have to remember
-# to type a scheme. Typing the bare IP now works.
-#
-# The redirect hop is cleartext and that is fine: it carries no credentials.
-# The browser has not been challenged yet and the proxy answers without ever
-# reaching the app.
+# Three open ports, four things wanted, so redirects alone cannot cover every
+# combination: any port serving TLS answers plain HTTP with "Client sent an
+# HTTP request to an HTTPS server", and any port serving plain HTTP fails the
+# TLS handshake, which Chrome reports as "This site can't provide a secure
+# connection". Both of those were hit in testing. A landing page on 80 ends
+# the guessing: type the bare IP, click a link, never hand-type a scheme or
+# port. The page carries no credentials, so serving it over plain HTTP is fine.
 # ---------------------------------------------------------------------------
 
 {
@@ -48,20 +45,16 @@
 
 # Canonical entry. A bare IP in a browser lands here.
 :80 {
-	redir https://47.250.10.235:5000{uri} permanent
+	root * /etc/caddy/landing
+	file_server
+	header Cache-Control "no-store"
 }
 
-# Kept so the port this service first published still works. Anyone who has
-# http://<ip>:8080 saved gets bounced to HTTPS instead of an error page.
-:8080 {
-	redir https://47.250.10.235:5000{uri} permanent
-}
-
-# The app, over TLS.
+# The drafting workbench.
 :5000, :8443 {
 	tls /etc/caddy/certs/workbench.crt /etc/caddy/certs/workbench.key
 
-	# The workbench reads X-Forwarded-For (uvicorn --proxy-headers
+	# The app reads X-Forwarded-For (uvicorn --proxy-headers
 	# --forwarded-allow-ips 127.0.0.1), so its per-IP auth throttle sees the
 	# real client rather than counting every failure against 127.0.0.1.
 	reverse_proxy 127.0.0.1:3015 {
@@ -74,9 +67,25 @@
 	# real certificate is in place.
 
 	encode gzip
-
 	log {
 		output file /var/log/caddy/workbench.log
+		format json
+	}
+}
+
+# The corpus search service. It used to bind 0.0.0.0:3014 itself and serve
+# plain HTTP, which meant its credentials crossed the public internet in the
+# clear on every request. It is loopback-only now and reachable only here.
+:8080 {
+	tls /etc/caddy/certs/workbench.crt /etc/caddy/certs/workbench.key
+
+	reverse_proxy 127.0.0.1:3014 {
+		header_up X-Forwarded-Proto https
+	}
+
+	encode gzip
+	log {
+		output file /var/log/caddy/corpus.log
 		format json
 	}
 }
