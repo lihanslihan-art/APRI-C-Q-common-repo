@@ -13,17 +13,22 @@ Run:
 """
 from __future__ import annotations
 
+import base64
+import binascii
+import hmac
 import html
 import json
 import os
 import sqlite3
+import threading
 import time
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 BASE = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("CORPUS_DB", BASE / "corpus.db"))
@@ -37,6 +42,77 @@ Mode = Literal["token", "phrase", "boolean", "prefix"]
 FTS_OPS = {"AND", "OR", "NOT", "NEAR"}
 
 _con: sqlite3.Connection | None = None
+
+# --------------------------------------------------------------------------
+# HTTP Basic auth
+#
+# This service is reachable from the public internet, so everything except the
+# health probe sits behind auth. The check runs as middleware rather than as a
+# route dependency so that no path can be added later and accidentally left
+# open, including /docs, /openapi.json and the static UI.
+# --------------------------------------------------------------------------
+
+AUTH_USER = os.environ.get("AUTH_USER", "")
+AUTH_PASS = os.environ.get("AUTH_PASS", "")
+ALLOW_NO_AUTH = os.environ.get("ALLOW_NO_AUTH", "") == "1"
+REALM = "Patent Corpus Search"
+
+# Only the liveness probe is open: it reveals nothing but a boolean.
+PUBLIC_PATHS = {"/healthz"}
+
+# A public Basic-auth endpoint gets scanned. Throttling failed attempts keeps
+# brute force, log spam and password-hash CPU burn bounded.
+FAIL_LIMIT = 10
+FAIL_WINDOW = 300.0
+_fails: dict[str, list[float]] = defaultdict(list)
+_fails_lock = threading.Lock()
+
+
+def _client_ip(request: Request) -> str:
+    # No reverse proxy in front of this deployment, so the peer address is the
+    # real client. If one is added later, trust its header explicitly here
+    # rather than believing X-Forwarded-For by default.
+    return request.client.host if request.client else "unknown"
+
+
+def _record_failure(ip: str) -> int:
+    now = time.monotonic()
+    with _fails_lock:
+        hits = [t for t in _fails[ip] if now - t < FAIL_WINDOW]
+        hits.append(now)
+        _fails[ip] = hits
+        return len(hits)
+
+
+def _is_throttled(ip: str) -> bool:
+    now = time.monotonic()
+    with _fails_lock:
+        hits = [t for t in _fails[ip] if now - t < FAIL_WINDOW]
+        _fails[ip] = hits
+        return len(hits) >= FAIL_LIMIT
+
+
+def _credentials_ok(header: str) -> bool:
+    if not header.startswith("Basic "):
+        return False
+    try:
+        raw = base64.b64decode(header[6:], validate=True).decode("utf-8")
+    except (binascii.Error, UnicodeDecodeError):
+        return False
+    user, _, password = raw.partition(":")
+    # Compare both halves in constant time, and always compare both so the
+    # timing does not reveal whether the username matched.
+    ok_user = hmac.compare_digest(user, AUTH_USER)
+    ok_pass = hmac.compare_digest(password, AUTH_PASS)
+    return ok_user and ok_pass
+
+
+def _unauthorized(detail: str = "authentication required") -> Response:
+    return JSONResponse(
+        {"detail": detail},
+        status_code=401,
+        headers={"WWW-Authenticate": f'Basic realm="{REALM}", charset="UTF-8"'},
+    )
 
 
 # FTS5's snippet() does not escape its input, so a corpus page containing
@@ -162,6 +238,14 @@ async def lifespan(app: FastAPI):
         raise RuntimeError(
             f"{DB_PATH} is missing. Build it first: python build_db.py"
         )
+    # Refuse to start unauthenticated unless that is asked for explicitly.
+    # The service is exposed publicly, so an empty password must be a loud
+    # failure rather than a silently open endpoint.
+    if not (AUTH_USER and AUTH_PASS) and not ALLOW_NO_AUTH:
+        raise RuntimeError(
+            "AUTH_USER and AUTH_PASS must be set (see .env.example). "
+            "To run without auth on a trusted network, set ALLOW_NO_AUTH=1."
+        )
     _con = sqlite3.connect(
         f"file:{DB_PATH}?mode=ro", uri=True, check_same_thread=False
     )
@@ -177,6 +261,31 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def basic_auth(request: Request, call_next):
+    if ALLOW_NO_AUTH and not (AUTH_USER and AUTH_PASS):
+        return await call_next(request)
+    if request.url.path in PUBLIC_PATHS:
+        return await call_next(request)
+
+    ip = _client_ip(request)
+    if _is_throttled(ip):
+        return JSONResponse(
+            {"detail": "too many failed attempts, try again later"},
+            status_code=429,
+            headers={"Retry-After": str(int(FAIL_WINDOW))},
+        )
+
+    header = request.headers.get("authorization", "")
+    if not header:
+        return _unauthorized()
+    if not _credentials_ok(header):
+        n = _record_failure(ip)
+        return _unauthorized(f"invalid credentials ({n}/{FAIL_LIMIT})")
+
+    return await call_next(request)
 
 
 def db() -> sqlite3.Connection:

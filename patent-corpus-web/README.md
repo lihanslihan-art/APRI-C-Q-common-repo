@@ -108,19 +108,44 @@ curl -G localhost:3014/api/search \
 
 ---
 
+## 认证
+
+全部接口走 HTTP Basic 认证，**唯一例外是 `/healthz`**，它只返回一个布尔值，
+留开给探活用。认证做在 middleware 而不是路由依赖上，这样将来新增路径不会漏掉，
+`/docs`、`/openapi.json` 和静态页面也一并覆盖。
+
+```bash
+cp .env.example .env
+python3 -c "import secrets; print(secrets.token_urlsafe(24))"   # 填进 AUTH_PASS
+chmod 600 .env
+```
+
+`.env` 不入 git。**凭据为空时服务拒绝启动**，缺文件会是一次响亮的失败而不是一个默默敞开的端口。
+只在可信内网裸跑时才设 `ALLOW_NO_AUTH=1`。
+
+两个实现细节：用户名和密码都用 `hmac.compare_digest` 做**定长时间比较**，
+且无论用户名是否匹配都比较两段，避免时序泄漏用户名是否存在；失败尝试按来源 IP 节流，
+5 分钟内 10 次失败后返回 429 并带 `Retry-After`。节流触发后正确凭据也会被拒，
+这是有意的锁定行为，5 分钟自动解除。
+
+---
+
 ## 部署
 
 | 项 | 值 |
 |---|---|
 | 端口 | 3014 |
-| 绑定 | 127.0.0.1，经反向代理对外 |
+| 绑定 | 0.0.0.0，经阿里云安全组对外 |
+| 认证 | HTTP Basic，见上 |
+| 传输 | **明文 HTTP，无 TLS** |
 | 进程管理 | systemd user unit，见 `deploy/` |
-| 常驻内存 | 37 MB 峰值 |
+| 常驻内存 | 39 MB 峰值 |
 
 ```bash
 cp deploy/patent-corpus-web.service ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now patent-corpus-web
+loginctl enable-linger admin     # 让 unit 在登出后继续运行
 ```
 
 unit 里所有路径都写绝对路径：本机 nvm 下的 node 是 v24 而 `/usr/bin/node` 是 v20，
@@ -129,6 +154,17 @@ systemd 的默认 PATH 找不到 nvm 的东西。同时 unit 用
 
 语料路径通过 `CORPUS_ROOT` 环境变量配置，数据库位置通过 `CORPUS_DB` 配置。
 **服务以只读方式打开数据库，且从不写入语料目录**，因此无法影响它所读取的上游工作区。
+
+### 关于 TLS
+
+当前是明文 HTTP，所以 **Basic 认证的凭据在链路上是可嗅探的**（base64 不是加密）。
+这是「最省事地放到公网」的直接代价。要上 TLS 需要装 caddy 或 nginx 做反代，
+但本机 443 端口被 xray 占用，反代要么换端口，要么配 xray 回落把非 VLESS 流量转给反代。
+
+### 内容暴露提示
+
+`/api/doc/{id}/page/{n}` 会返回 IEEE 标准的全文页面，那是受版权保护的商业出版物。
+认证是这批内容与公网之间唯一的一层，**不要把凭据外发，也不要关掉认证**。
 
 ---
 

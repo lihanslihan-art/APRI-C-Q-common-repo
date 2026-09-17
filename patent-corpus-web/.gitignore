@@ -6,3 +6,6 @@ corpus.db.tmp
 .venv/
 __pycache__/
 *.pyc
+
+# Local credentials (see .env.example)
+.env
