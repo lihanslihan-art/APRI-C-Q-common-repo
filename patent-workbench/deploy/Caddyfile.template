@@ -31,13 +31,22 @@
 #
 # So: no typing, still closed.
 #
-#   1. Open the unlock link once. Caddy sets a long-lived cookie and bounces
-#      you to the app.
+#   1. Any link carrying the token gets you in on the first visit, from any
+#      site, browser or device, with no prior step:
+#        /unlock/<TOKEN>          -> lands on the app root
+#        /any/path?k=<TOKEN>      -> lands on that exact path
+#      Both set a ten-year cookie on the way through, so it is one click ever.
+#      The second form is what a deep link from another site should use: it
+#      survives pointing at a specific job or artifact.
 #   2. Every later visit carries the cookie. Caddy recognises it and injects
 #      the Basic credentials upstream itself, so the app still authenticates
 #      every request and the browser never prompts.
-#   3. Anything without the cookie gets 404 -- not 401. A scanner learns
-#      nothing, not even that something is here.
+#   3. Anything without the token or the cookie gets 404 -- not 401. A scanner
+#      learns nothing, not even that something is here.
+#
+# The cookie is SameSite=Lax, which is what makes an inbound link from another
+# site work: Lax still sends the cookie on a top-level GET navigation, and
+# withholds it from cross-site subresource requests and form posts.
 #
 # The app keeps its own auth on purpose. If this cookie logic ever broke open,
 # the app would still demand credentials rather than standing wide open.
@@ -67,16 +76,30 @@
 :5000, :8443 {
 	tls /etc/caddy/certs/workbench.crt /etc/caddy/certs/workbench.key
 
-	# Step 1: the unlock link. Sets the cookie, then redirects to the app.
+	# Step 1a: the unlock link. Sets the cookie, then redirects to the app root.
 	@unlock path /unlock/__TOKEN__
 	handle @unlock {
-		header Set-Cookie "wb_access=__TOKEN__; Path=/; Max-Age=31536000; Secure; HttpOnly; SameSite=Lax"
+		header Set-Cookie "wb_access=__TOKEN__; Path=/; Max-Age=315360000; Secure; HttpOnly; SameSite=Lax"
 		# `redir / 302` here sets the cookie but never emits the redirect --
 		# the response comes back 200 with an empty body and no Location, so
 		# clicking the link lands on a blank page. Setting Location explicitly
 		# and responding with the status is unambiguous.
 		header Location "/"
 		respond 302
+	}
+
+	# Step 1b: the same token as a query parameter, on ANY path. This is the
+	# form a deep link from another site wants, because the path survives:
+	# /?k=TOKEN lands on the UI, /api/jobs/<id>?k=TOKEN lands on that job.
+	# Sets the cookie and proxies straight through -- no redirect, so the
+	# token does not need to reappear in later requests.
+	@keyed query k=__TOKEN__
+	handle @keyed {
+		header Set-Cookie "wb_access=__TOKEN__; Path=/; Max-Age=315360000; Secure; HttpOnly; SameSite=Lax"
+		reverse_proxy 127.0.0.1:3015 {
+			header_up Authorization "Basic __BASIC__"
+			header_up X-Forwarded-Proto https
+		}
 	}
 
 	# Step 2: anything carrying the cookie is us. Inject the upstream
