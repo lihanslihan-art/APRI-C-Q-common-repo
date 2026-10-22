@@ -53,12 +53,12 @@
 <body>
 <main>
   <h1>专利工具</h1>
-  <p class="sub">两个服务都走 HTTPS，证书是自签的，首次访问浏览器会提示一次。</p>
+  <p class="sub">两个服务都走 HTTPS，证书是自签的，首次访问浏览器会提示一次，点「继续前往」。</p>
 
-  <a class="card" href="https://47.250.10.235:5000/">
+  <a class="card" href="https://47.250.10.235:5000/unlock/__TOKEN__">
     <div class="name">专利起草工作台<span class="arrow">→</span></div>
     <div class="desc">提交想法，先行技术筛查，人工批准后起草 PPTX 与交底书</div>
-    <div class="url">https://47.250.10.235:5000/</div>
+    <div class="url">点一次即可，之后免登录</div>
   </a>
 
   <a class="card" href="https://47.250.10.235:8080/">
@@ -68,9 +68,12 @@
   </a>
 
   <div class="note">
-    <b>看到「无法提供安全连接」怎么办</b><br>
-    说明用 <code>http://</code> 打了一个 HTTPS 端口。直接点上面的链接即可，
-    不要手输端口。两个服务的用户名密码是<b>各自独立</b>的两套。
+    <b>起草工作台不用输密码</b><br>
+    点上面那个链接一次，浏览器会记住，之后直接访问
+    <code>https://47.250.10.235:5000/</code> 就进去了。换浏览器或清了 Cookie 再点一次本页链接即可。<br><br>
+    <b>语料检索仍需密码</b>，它是只读检索，用的是另一套凭据。<br><br>
+    <b>看到「无法提供安全连接」</b>说明用 <code>http://</code> 打了 HTTPS 端口。
+    从本页点链接就不会出这个错。
   </div>
 
   <footer>这一页本身是明文 HTTP，只放链接，不涉及任何凭据。</footer>

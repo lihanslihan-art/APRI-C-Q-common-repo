@@ -1,0 +1,124 @@
+# TLS reverse proxy for both patent services. TEMPLATE -- do not deploy directly.
+#
+# This file is in git; the rendered one is not, because rendering substitutes a
+# secret. Deploy with:
+#
+#   sudo ./deploy/render_caddyfile.sh
+#
+# which reads .env, fills in __TOKEN__ and __BASIC__, writes
+# /etc/caddy/Caddyfile and restarts caddy.
+#
+# RESTART, not reload. `admin off` below turns off Caddy's admin API on
+# localhost:2019, and `systemctl reload caddy` works by POSTing the new config
+# to exactly that API -- so reload fails with "connection refused" while
+# `caddy validate` passes. Keeping the admin API off is worth that: it is one
+# less local endpoint that can rewrite this proxy's configuration.
+#
+# ---------------------------------------------------------------------------
+# Access: an unlock link, not a password prompt
+#
+# Opening the workbench used to mean a browser Basic-auth dialog. Nobody got
+# past it, and the access log shows why that matters: every request on
+# 2026-10-22 arrived with no Authorization header at all and got 401, so the
+# UI was simply unreachable.
+#
+# It is also not an endpoint to leave open. It starts agent sessions that can
+# run an interpreter, write files and reach the network, on a host that also
+# runs the VPN and ten other services. Over three days this port logged 66
+# distinct source IPs probing 259 distinct paths -- /.git/config, /client/.env,
+# /backup/.env, /.env.dev, /metrics, /mcp, /sse -- bots hunting for exactly
+# this kind of thing. Unauthenticated, any of them could POST /api/jobs.
+#
+# So: no typing, still closed.
+#
+#   1. Open the unlock link once. Caddy sets a long-lived cookie and bounces
+#      you to the app.
+#   2. Every later visit carries the cookie. Caddy recognises it and injects
+#      the Basic credentials upstream itself, so the app still authenticates
+#      every request and the browser never prompts.
+#   3. Anything without the cookie gets 404 -- not 401. A scanner learns
+#      nothing, not even that something is here.
+#
+# The app keeps its own auth on purpose. If this cookie logic ever broke open,
+# the app would still demand credentials rather than standing wide open.
+# ---------------------------------------------------------------------------
+#
+# Port layout. 443 is unavailable (xray owns it) and the Aliyun security group
+# only allows 80, 5000 and 8080; everything else probed times out.
+#
+#   :80    plain HTTP  landing page with the unlock links
+#   :5000  HTTPS       drafting workbench
+#   :8080  HTTPS       corpus search
+#   :8443  HTTPS       workbench again, ready if the group ever opens it
+
+{
+	admin off
+	auto_https off
+}
+
+# Landing page. Plain HTTP, carries no credentials, only links.
+:80 {
+	root * /etc/caddy/landing
+	file_server
+	header Cache-Control "no-store"
+}
+
+# The drafting workbench.
+:5000, :8443 {
+	tls /etc/caddy/certs/workbench.crt /etc/caddy/certs/workbench.key
+
+	# Step 1: the unlock link. Sets the cookie, then redirects to the app.
+	@unlock path /unlock/__TOKEN__
+	handle @unlock {
+		header Set-Cookie "wb_access=__TOKEN__; Path=/; Max-Age=31536000; Secure; HttpOnly; SameSite=Lax"
+		# `redir / 302` here sets the cookie but never emits the redirect --
+		# the response comes back 200 with an empty body and no Location, so
+		# clicking the link lands on a blank page. Setting Location explicitly
+		# and responding with the status is unambiguous.
+		header Location "/"
+		respond 302
+	}
+
+	# Step 2: anything carrying the cookie is us. Inject the upstream
+	# credentials so the app authenticates and the browser never prompts.
+	@unlocked header Cookie *wb_access=__TOKEN__*
+	handle @unlocked {
+		reverse_proxy 127.0.0.1:3015 {
+			header_up Authorization "Basic __BASIC__"
+			header_up X-Forwarded-Proto https
+		}
+	}
+
+	# Step 3: everyone else. 404, not 401 -- a scanner learns nothing.
+	handle {
+		respond "not found" 404
+	}
+
+	# Deliberately NO Strict-Transport-Security while the certificate is
+	# self-signed: HSTS would stop the browser from letting anyone click
+	# through the certificate warning, locking everyone out. Add it the day a
+	# real certificate is in place.
+
+	encode gzip
+	log {
+		output file /var/log/caddy/workbench.log
+		format json
+	}
+}
+
+# The corpus search service. Read-only search, so it keeps the plain Basic
+# prompt: there is no agent behind it and no code execution to hand out. It
+# binds 127.0.0.1 and is reachable only here.
+:8080 {
+	tls /etc/caddy/certs/workbench.crt /etc/caddy/certs/workbench.key
+
+	reverse_proxy 127.0.0.1:3014 {
+		header_up X-Forwarded-Proto https
+	}
+
+	encode gzip
+	log {
+		output file /var/log/caddy/corpus.log
+		format json
+	}
+}

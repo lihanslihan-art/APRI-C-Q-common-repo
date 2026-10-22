@@ -1,7 +1,7 @@
 # patent-workbench
 
 专利起草工作台。**方案 D,已部署并端到端跑通,公网可访问**。
-浏览器直接输 `47.250.10.235`,入口页上点链接即可。
+浏览器直接输 `47.250.10.235`,入口页上点解锁链接即可,**不需要密码**。
 应用本身只绑 127.0.0.1:3015,经 Caddy 做 TLS 反向代理。见「公网访问」一节。
 
 这是提案四个方案里的 D:**不重写提示词,而是用 headless Claude Code 原样驱动上游那套技能**。
@@ -186,73 +186,92 @@ HTTP 层一律 404)、作业状态机。
 
 ## 公网访问
 
-浏览器里输:
+**不需要输用户名密码。** 浏览器打开一次解锁链接,之后永久免登录:
 
 ```
-47.250.10.235
+https://47.250.10.235:5000/unlock/<ACCESS_TOKEN>
 ```
 
-得到一个入口页,上面是两个服务的正确 HTTPS 链接,点进去即可。
-自签证书会提示一次,点「继续前往」。**两个服务的用户名密码是各自独立的两套。**
+完整链接由 `deploy/render_caddyfile.sh` 在结尾打印,`ACCESS_TOKEN` 在 `.env` 里。
+`http://47.250.10.235/` 的入口页上也有这个链接,从那里点最省事。
+自签证书会提示一次,点「继续前往」。
 
-| 服务 | 地址 | 凭据来源 |
-|---|---|---|
-| 起草工作台 | `https://47.250.10.235:5000/` | `patent-workbench/.env` |
-| 语料检索 | `https://47.250.10.235:8080/` | `patent-corpus-web/.env` |
+解锁之后直接访问 `https://47.250.10.235:5000/` 就进去了。
+换浏览器、换设备或清了 Cookie,再点一次解锁链接即可。
 
-命令行(自签证书要 `-k`):
+| 服务 | 访问方式 |
+|---|---|
+| 起草工作台 | 解锁链接,之后免密码 |
+| 语料检索 | `https://47.250.10.235:8080/`,仍用 Basic 认证,凭据在 `patent-corpus-web/.env` |
+
+### 为什么是解锁链接,不是直接关掉认证
+
+浏览器的 Basic 认证弹框实际上挡住了人:访问日志显示某天**所有请求都没带认证头、全部 401**,
+UI 根本进不去。所以密码这一关确实该去掉。
+
+但这个端点不能敞开。它会启动能运行解释器、能写文件、能访问网络的 Agent 会话,
+而这台机器同时跑着 VPN 和另外十个服务。同一个端口三天内记录了
+**66 个不同来源 IP 探测 259 种路径**——`/.git/config`、`/client/.env`、`/backup/.env`、
+`/.env.dev`、`/metrics`、`/mcp`、`/sse`,全是在找这类暴露。无认证的话,
+它们任何一个都能 POST `/api/jobs` 起一个 Agent。
+
+所以:**不用打字,但仍然关着。**
+
+1. 打开解锁链接一次,Caddy 设一个一年期 Cookie 并把你送进应用。
+2. 之后每次访问都带着这个 Cookie,Caddy 认出来后**自己注入 Basic 凭据**给上游,
+   应用照常逐请求认证,而浏览器永远不弹框。
+3. 没有 Cookie 的请求返回 **404 而不是 401**,扫描器连「这里有东西」都探不出来。
+
+应用自己的认证**故意保留**:万一这套 Cookie 逻辑哪天破了,应用仍然要求凭据,
+不会直接敞开。
+
+想换成别的方式也容易。**IP 白名单**是更强的一道,Caddy 里加
+`@allowed remote_ip <你的IP>` 即可,前提是出口 IP 固定。
+**真的要完全敞开**就在 `.env` 里设 `ALLOW_NO_AUTH=1` 并把模板里的
+`@unlocked` 判断去掉——看过上面那份扫描日志再决定。
+
+### 配置是渲染出来的,不是直接编辑
+
+渲染后的配置里有解锁 token 和上游凭据两个秘密,所以**只有模板入 git**:
 
 ```bash
-curl -k -u 'apri:<工作台密码>' https://47.250.10.235:5000/api/slots
-curl -k -u 'apri:<语料密码>'   https://47.250.10.235:8080/api/stats
+sudo ./deploy/render_caddyfile.sh
 ```
 
-### 为什么是入口页,不是跳转
+它读 `.env`,填好 `deploy/Caddyfile.template` 和 `deploy/landing.html` 里的占位符,
+写到 `/etc/caddy/Caddyfile`(权限 640 root:caddy)和 `/etc/caddy/landing/index.html`,
+校验后重启 caddy,最后把完整解锁链接打印出来。
 
-443 用不了,被 xray(VPN)占着。把安全组逐个端口探过:在本机 curl 实例自己的公网 IP
-**会经过安全组**,已放行的端口正常应答,未放行的**超时**。放行的只有 **80、5000、8080**
-三个(3001、3016、3020、7000、8000、8081、8082、8090、8443、8888、9090、10000 全部超时)。
+**是 restart 不是 reload。** `admin off` 关掉了 Caddy 在 localhost:2019 的管理接口,
+而 `systemctl reload caddy` 正是往那个接口 POST 新配置,所以 reload 会以
+"connection refused" 失败而 `caddy validate` 却通过。
 
-三个端口要承载四件事,光靠跳转覆盖不全,而且两种错都在测试中真实踩到过:
+**轮换 token**:改 `.env` 里的 `ACCESS_TOKEN`,重跑渲染脚本。旧链接和旧 Cookie 立即失效。
 
-| 错误现象 | 原因 |
-|---|---|
-| `Client sent an HTTP request to an HTTPS server` | 用 `http://` 打了 TLS 端口 |
-| `This site can't provide a secure connection` | 用 `https://` 打了明文端口 |
+### 端口布局
 
-任何端口只能二选一,所以只要还需要手输端口,就一定有一半的人输错。**入口页终结这件事**:
-输裸 IP、点链接,永远不用手写 scheme 和端口。这一页不涉及任何凭据,走明文 HTTP 没有问题。
-
-当前布局:
+443 用不了,被 xray(VPN)占着。安全组逐个端口探过,只放行 **80、5000、8080**
+(3001、3016、3020、7000、8000、8081、8082、8090、8443、8888、9090、10000 全部超时)。
 
 | 端口 | 协议 | 内容 |
 |---|---|---|
-| 80 | 明文 HTTP | 入口页(只有链接) |
+| 80 | 明文 HTTP | 入口页(只有链接,不涉及凭据) |
 | 5000 | HTTPS | 起草工作台 |
 | 8080 | HTTPS | 语料检索 |
 | 8443 | HTTPS | 工作台备用,安全组放行后可用 |
 
-**两个应用都只绑回环**,Caddy 是唯一的公网入口。语料服务原先自己绑 `0.0.0.0:3014`
-跑明文,凭据每次请求都明文过公网,现在已改为仅回环。
+协议错配有两个对称的报错,都踩过:用 `http://` 打 TLS 端口得到
+`Client sent an HTTP request to an HTTPS server`;用 `https://` 打明文端口
+Chrome 显示 `This site can't provide a secure connection`。
+一个端口只能二选一,所以**从入口页点链接,不要手输端口**。
 
-### 安装
-
-```bash
-sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
-sudo mkdir -p /etc/caddy/landing && sudo cp deploy/landing.html /etc/caddy/landing/index.html
-sudo systemctl restart caddy
-```
-
-**是 restart 不是 reload。** `admin off` 关掉了 Caddy 在 localhost:2019 的管理接口,
-而 `systemctl reload caddy` 正是往那个接口 POST 新配置——所以 reload 会以
-"connection refused" 失败,而 `caddy validate` 却通过。保留 `admin off` 值得这点代价:
-少一个能重写本代理配置的本地接口。
+**两个应用都只绑回环**,Caddy 是唯一的公网入口。
 
 ### 证书有个必须守的上限
 
 **Chrome 拒绝有效期超过 398 天的证书**,报 `ERR_CERT_VALIDITY_TOO_LONG`,
-而且这条**不能点「继续前往」绕过**——地址输对了也进不去。
-第一版签成 825 天就是这个问题。重新签发时务必 `-days 397` 或更短:
+而且这条**不能点「继续前往」绕过**——地址输对了也进不去,而 curl 完全正常,极易误判。
+重新签发务必 `-days 397` 或更短:
 
 ```bash
 sudo openssl req -x509 -newkey rsa:2048 -nodes -days 397 \
@@ -264,24 +283,10 @@ sudo openssl req -x509 -newkey rsa:2048 -nodes -days 397 \
 sudo systemctl restart caddy
 ```
 
-配置里**故意没有加 HSTS**:自签证书下 HSTS 会让浏览器不再允许点过证书警告,
-直接把所有人锁在外面。等换了真证书再加。
+配置里**故意没有 HSTS**:自签证书下 HSTS 会让浏览器不再允许点过证书警告,把所有人锁在外面。
 
-**把任意域名指向这个 IP 就能换成真证书**,同时也免掉 398 天这个手工负担。
-80 端口已放行且现在服务入口页,ACME HTTP-01 校验可用;Caddyfile 里把 `:5000`
-换成 `your.domain:5000`、删掉 `tls` 那行让 Caddy 自动签发即可。
-
-### 用 curl 测跳转时注意
-
-`curl -L` 跨端口跳转时会**主动丢弃 `Authorization` 头**(把不同端口视为不同来源)。
-现在入口页不再跳转所以影响不大,但如果你加了跳转,记得用 `--location-trusted`。
-
-### 想进一步收紧
-
-- **IP 白名单**:Caddy 里加 `@allowed remote_ip <你的IP>`,只放行已知来源。
-  出口 IP 固定的话这是性价比最高的一道。
-- **改回仅隧道访问**:停掉 caddy,用 `ssh -L 5000:127.0.0.1:3015 admin@47.250.10.235`,
-  暴露面归零。
+**指任意域名到这个 IP 就能换真证书**,也免掉 398 天这个手工负担。
+80 端口已放行且在服务入口页,ACME HTTP-01 可用。
 
 ## API
 

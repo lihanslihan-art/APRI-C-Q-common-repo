@@ -12,3 +12,7 @@ __pycache__/
 
 # Caches redirected here because the sandbox makes ~/.cache read-only
 .cache/
+
+# Rendered from deploy/Caddyfile.template; contains the unlock token and
+# the upstream Basic credentials. Regenerate with deploy/render_caddyfile.sh.
+deploy/Caddyfile
